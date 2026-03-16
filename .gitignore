@@ -1,6 +1,9 @@
 # Default generated output (users should not commit these unless intentional)
 interactive_diagram.html
 
+# Cached Mermaid.js bundle (downloaded on first run)
+mermaid.min.js
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

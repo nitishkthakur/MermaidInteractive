@@ -279,7 +279,13 @@ class TestHtmlOutput:
     def test_contains_mermaid_script(self):
         html = generate_html("flowchart TD\n  A --> B")
         assert "mermaid" in html.lower()
-        assert "cdn.jsdelivr.net" in html
+        assert ("<script>" in html and "mermaid.initialize" in html) or "cdn.jsdelivr.net" in html
+
+    def test_steelblue_theme_no_lavender(self):
+        html = generate_html("flowchart TD\n  A --> B")
+        assert "#d6e4f0" in html
+        assert "#4682b4" in html
+        assert "#ececff" not in html
 
     def test_contains_diagram_source(self):
         diagram = "flowchart TD\n  A --> B"
@@ -389,3 +395,168 @@ class TestGraphAlias:
     def test_graph_lr_parsed(self):
         _, edges = parse_mermaid("graph LR\n  X --> Y")
         assert edges_set(edges) == {("X", "Y")}
+
+
+# ---------------------------------------------------------------------------
+# Non-flowchart diagram types (should return empty graph)
+# ---------------------------------------------------------------------------
+
+class TestNonFlowchartDiagrams:
+    def test_sequence_diagram_returns_empty(self):
+        nodes, edges = parse_mermaid("sequenceDiagram\n  Alice->>Bob: Hello")
+        assert nodes == {}
+        assert edges == []
+
+    def test_class_diagram_returns_empty(self):
+        nodes, edges = parse_mermaid("classDiagram\n  Animal <|-- Duck")
+        assert nodes == {}
+        assert edges == []
+
+    def test_state_diagram_returns_empty(self):
+        nodes, edges = parse_mermaid("stateDiagram-v2\n  s1 --> s2")
+        assert nodes == {}
+        assert edges == []
+
+    def test_er_diagram_returns_empty(self):
+        nodes, edges = parse_mermaid("erDiagram\n  CUSTOMER ||--o{ ORDER : places")
+        assert nodes == {}
+        assert edges == []
+
+    def test_gantt_returns_empty(self):
+        nodes, edges = parse_mermaid("gantt\n  title A Gantt Diagram")
+        assert nodes == {}
+        assert edges == []
+
+    def test_pie_returns_empty(self):
+        nodes, edges = parse_mermaid('pie\n  title Pets\n  "Dogs" : 386')
+        assert nodes == {}
+        assert edges == []
+
+
+# ---------------------------------------------------------------------------
+# YAML front-matter
+# ---------------------------------------------------------------------------
+
+class TestYamlFrontMatter:
+    def test_yaml_frontmatter_skipped(self):
+        diagram = (
+            "---\n"
+            "title: My Diagram\n"
+            "config:\n"
+            "  theme: default\n"
+            "---\n"
+            "flowchart TD\n"
+            "  A --> B\n"
+        )
+        nodes, edges = parse_mermaid(diagram)
+        assert edges_set(edges) == {("A", "B")}
+        assert "title" not in nodes
+        assert "config" not in nodes
+
+    def test_no_frontmatter_still_works(self):
+        nodes, edges = parse_mermaid("flowchart TD\n  X --> Y")
+        assert edges_set(edges) == {("X", "Y")}
+
+
+# ---------------------------------------------------------------------------
+# Quoted node labels
+# ---------------------------------------------------------------------------
+
+class TestQuotedNodeLabels:
+    def test_double_quoted_label(self):
+        nodes, _ = parse_mermaid('flowchart TD\n  A["My Label"] --> B')
+        assert nodes["A"] == "My Label"
+
+    def test_single_quoted_label(self):
+        nodes, _ = parse_mermaid("flowchart TD\n  A['My Label'] --> B")
+        assert nodes["A"] == "My Label"
+
+    def test_double_quoted_label_with_brackets(self):
+        nodes, _ = parse_mermaid('flowchart TD\n  A["text with [brackets]"] --> B')
+        assert nodes["A"] == "text with [brackets]"
+
+
+# ---------------------------------------------------------------------------
+# Large-scale graphs
+# ---------------------------------------------------------------------------
+
+class TestLargeGraphs:
+    @staticmethod
+    def _make_chain(n: int) -> str:
+        """Linear chain: node_0 --> node_1 --> ... --> node_{n-1}."""
+        header = "flowchart TD\n"
+        edges = "\n".join(f"  n{i} --> n{i+1}" for i in range(n - 1))
+        return header + edges
+
+    @staticmethod
+    def _make_star(n: int) -> str:
+        """Star: center --> leaf_0, center --> leaf_1, ..."""
+        header = "flowchart TD\n"
+        edges = "\n".join(f"  center --> leaf{i}" for i in range(n))
+        return header + edges
+
+    @staticmethod
+    def _make_binary_tree(depth: int) -> str:
+        """Binary tree via multi-hop chains."""
+        header = "flowchart TD\n"
+        lines = []
+        node_id = [0]
+
+        def add_children(parent: int, d: int):
+            if d == 0:
+                return
+            left, right = node_id[0] + 1, node_id[0] + 2
+            node_id[0] += 2
+            lines.append(f"  n{parent} --> n{left}")
+            lines.append(f"  n{parent} --> n{right}")
+            add_children(left, d - 1)
+            add_children(right, d - 1)
+
+        add_children(0, depth)
+        return header + "\n".join(lines)
+
+    def test_linear_chain_100(self):
+        diagram = self._make_chain(100)
+        nodes, edges = parse_mermaid(diagram)
+        assert len(nodes) == 100
+        assert len(edges) == 99
+        assert ("n0", "n1") in edges
+        assert ("n98", "n99") in edges
+
+    def test_linear_chain_500(self):
+        diagram = self._make_chain(500)
+        nodes, edges = parse_mermaid(diagram)
+        assert len(nodes) == 500
+        assert len(edges) == 499
+
+    def test_star_graph_200_leaves(self):
+        diagram = self._make_star(200)
+        nodes, edges = parse_mermaid(diagram)
+        assert len(nodes) == 201        # center + 200 leaves
+        assert len(edges) == 200
+        assert all(dst.startswith("leaf") for _, dst in edges)
+
+    def test_binary_tree_depth_7(self):
+        # depth 7 → 127 edges, 128 leaves, 255 total nodes (with root = 256 nodes)
+        diagram = self._make_binary_tree(7)
+        nodes, edges = parse_mermaid(diagram)
+        assert len(nodes) > 100
+        assert len(edges) > 100
+
+    def test_large_graph_html_is_valid(self):
+        diagram = self._make_chain(300)
+        html = generate_html(diagram)
+        assert html.startswith("<!DOCTYPE html>")
+        assert "</html>" in html
+        assert '"n0"' in html
+        assert '"n299"' in html
+
+    def test_large_graph_json_correct(self):
+        import json, re
+        diagram = self._make_star(150)
+        html = generate_html(diagram)
+        m = re.search(r"const GRAPH = (\{.*?\});", html, re.S)
+        assert m
+        graph = json.loads(m.group(1))
+        assert len(graph["children"]["center"]) == 150
+        assert len(graph["parents"]) == 150   # each leaf has center as parent

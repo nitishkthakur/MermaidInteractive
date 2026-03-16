@@ -33,6 +33,7 @@ import json
 import html as html_module
 import argparse
 import os
+import urllib.request
 
 # ---------------------------------------------------------------------------
 # Mermaid structural parser
@@ -46,6 +47,8 @@ _SHAPE = (
     r"\[\[[^\[\]]*\]\]"        # [[label]]  subroutine
     r"|\[\([^()]*\)\]"         # [(label)]  cylinder / database
     r"|\(\([^()]*\)\)"         # ((label))  circle
+    r'|\["[^"]*"\]'             # ["label"]  double-quoted rectangle
+    r"|\['[^']*'\]"             # ['label']  single-quoted rectangle
     r"|\[/?[^\[\]]*[/\\]?\]"   # [label] [/label/] [\label\] …
     r"|\([^()]*\)"             # (label)    rounded rect
     r"|\{\{[^{}]*\}\}"         # {{label}}  hexagon
@@ -131,6 +134,8 @@ def _node_label(token: str) -> str:
         r"\(\(([^()]*)\)\)",               # ((label))
         r"\[/([^\[\]/\\]*)[/\\]?\]",       # [/label/]
         r"\[\\([^\[\]/\\]*)/?]",           # [\label\]
+        r'\["([^"]*)"\]',                  # ["label"]
+        r"\['([^']*)'\]",                  # ['label']
         r"\[([^\[\]]*)\]",                 # [label]
         r"\(([^()]*)\)",                   # (label)
         r"\{\{([^{}]*)\}\}",              # {{label}}
@@ -238,6 +243,14 @@ _SKIP_RE = re.compile(
     re.I,
 )
 
+# Diagram types that are not flowcharts — return empty graph immediately
+_NON_FLOWCHART_RE = re.compile(
+    r"^(?:sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram"
+    r"|gitGraph|gantt|pie|journey|quadrantChart|xychart-beta"
+    r"|block-beta|mindmap|timeline)\b",
+    re.I,
+)
+
 
 def parse_mermaid(text: str) -> tuple[dict[str, str], list[tuple[str, str]]]:
     """
@@ -258,6 +271,9 @@ def parse_mermaid(text: str) -> tuple[dict[str, str], list[tuple[str, str]]]:
     nodes: dict[str, str] = {}
     edges: list[tuple[str, str]] = []
 
+    diagram_type_seen = False
+    in_frontmatter = False
+
     for raw in text.splitlines():
         line = raw.strip()
 
@@ -265,15 +281,27 @@ def parse_mermaid(text: str) -> tuple[dict[str, str], list[tuple[str, str]]]:
         if not line or line.startswith("%%"):
             continue
 
+        # YAML front-matter (--- ... ---)
+        if not diagram_type_seen and line == "---":
+            in_frontmatter = not in_frontmatter
+            continue
+        if in_frontmatter:
+            continue
+
+        if line in ("...",) or line.startswith("%%{"):
+            continue
+
+        # non-flowchart early exit on first real line
+        if not diagram_type_seen:
+            if _NON_FLOWCHART_RE.match(line):
+                return {}, []
+            diagram_type_seen = True
+
         # diagram-type header: 'flowchart TD', 'graph LR', …
         if re.match(r"^(flowchart|graph)\b", line, re.I):
             # Only skip if the line has no edge content
             if not _HAS_ARROW_RE.search(line):
                 continue
-
-        # front-matter fences
-        if line in ("---", "...") or line.startswith("%%{"):
-            continue
 
         # non-structural directives
         if _SKIP_RE.match(line):
@@ -361,8 +389,6 @@ _HTML_TEMPLATE = """\
     }
     .tb-btn:hover { background: #f0f4f8; border-color: steelblue; }
 
-    #reset-btn { display: none; }
-
     /* ── diagram area ─────────────────────────────────────────────────── */
     #diagram-container {
       flex: 1;
@@ -370,18 +396,13 @@ _HTML_TEMPLATE = """\
       margin: 1.25rem;
       border-radius: 8px;
       box-shadow: 0 1px 8px rgba(0,0,0,.08);
-      padding: 2rem 2.5rem;
       min-height: calc(100vh - 6rem);
-      overflow: auto;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
+      overflow: hidden;
+      position: relative;
+      cursor: grab;
+      user-select: none;
     }
-
-    #diagram-container .mermaid {
-      min-width: 600px;
-      width: 100%;
-    }
+    #diagram-container.panning { cursor: grabbing; }
 
     /* ── node highlight states ───────────────────────────────────────── */
     .node { transition: opacity .22s, filter .22s; cursor: pointer; }
@@ -419,7 +440,7 @@ _HTML_TEMPLATE = """\
 <body>
   <div id="toolbar">
     <button id="download-btn" class="tb-btn" onclick="downloadPNG()">&#x2193;&nbsp;Download PNG</button>
-    <button id="reset-btn" class="tb-btn" onclick="resetHighlight()">&#x21BA;&nbsp;Reset view</button>
+    <button id="reset-btn" class="tb-btn" onclick="resetView()">&#x21BA;&nbsp;Reset view</button>
   </div>
   <div id="diagram-container">
     <pre class="mermaid">
@@ -427,8 +448,7 @@ MERMAID_SOURCE
     </pre>
   </div>
 
-  <!-- Mermaid.js v10 -->
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  MERMAID_JS_TAG
   <script>
     // ── graph data injected by Python ────────────────────────────────────
     const GRAPH = GRAPH_JSON;
@@ -437,7 +457,14 @@ MERMAID_SOURCE
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: "loose",
-      theme: "default"
+      theme: "default",
+      themeVariables: {
+        primaryColor: "#d6e4f0",
+        primaryBorderColor: "#4682b4",
+        primaryTextColor: "#1a1a2e",
+        secondaryColor: "#dce8f5",
+        tertiaryColor: "#e8f2fa"
+      }
     });
 
     // ── graph traversal (BFS) ────────────────────────────────────────────
@@ -528,7 +555,11 @@ MERMAID_SOURCE
         el.classList.remove("mi-selected", "mi-related", "mi-dim");
       });
       selectedId = null;
-      document.getElementById("reset-btn").style.display = "none";
+    }
+
+    function resetView() {
+      resetHighlight();
+      if (window._fitDiagram) window._fitDiagram();
     }
 
     function applyHighlight(nodeId) {
@@ -558,7 +589,6 @@ MERMAID_SOURCE
         }
       });
 
-      document.getElementById("reset-btn").style.display = "inline-block";
     }
 
     // ── download PNG ─────────────────────────────────────────────────────
@@ -592,6 +622,8 @@ MERMAID_SOURCE
         canvas.width  = w * 2;
         canvas.height = h * 2;
         const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.scale(2, 2);
         ctx.drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(url);
@@ -618,22 +650,107 @@ MERMAID_SOURCE
         return;
       }
 
-      // make the SVG fill its container responsively
-      svg.removeAttribute("height");
-      svg.style.width = "100%";
-      svg.style.minWidth = "600px";
+      const container = document.getElementById("diagram-container");
 
-      // attach click handlers to every node <g>
+      // -- Read natural SVG size from viewBox (set by Mermaid) --------------
+      let naturalW, naturalH;
+      const vb = svg.viewBox && svg.viewBox.baseVal;
+      if (vb && vb.width > 0) {
+        naturalW = vb.width;
+        naturalH = vb.height;
+      } else {
+        const r = svg.getBoundingClientRect();
+        naturalW = r.width  || 800;
+        naturalH = r.height || 600;
+      }
+      svg.setAttribute("width",  naturalW);
+      svg.setAttribute("height", naturalH);
+      svg.style.display = "block";
+
+      // -- Wrap SVG in a transform layer ------------------------------------
+      const zoomLayer = document.createElement("div");
+      zoomLayer.style.cssText =
+        "display:inline-block;transform-origin:0 0;will-change:transform;";
+      svg.parentNode.insertBefore(zoomLayer, svg);
+      zoomLayer.appendChild(svg);
+
+      // -- Pan / zoom state -------------------------------------------------
+      let scale = 1, tx = 0, ty = 0;
+
+      function applyTransform() {
+        zoomLayer.style.transform =
+          `translate(${tx}px,${ty}px) scale(${scale})`;
+      }
+
+      function fitDiagram() {
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        scale = Math.min((cw - 40) / naturalW, (ch - 40) / naturalH);
+        tx = Math.max((cw - naturalW * scale) / 2, 0);
+        ty = Math.max((ch - naturalH * scale) / 2, 0);
+        applyTransform();
+      }
+
+      fitDiagram();
+      window._fitDiagram = fitDiagram;
+
+      // -- Wheel → zoom toward cursor ---------------------------------------
+      container.addEventListener("wheel", e => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        const r  = container.getBoundingClientRect();
+        const mx = e.clientX - r.left;
+        const my = e.clientY - r.top;
+        tx = mx - (mx - tx) * factor;
+        ty = my - (my - ty) * factor;
+        scale = Math.max(0.05, Math.min(20, scale * factor));
+        applyTransform();
+      }, { passive: false });
+
+      // -- Drag → pan -------------------------------------------------------
+      let isPanning = false, moved = false;
+      let px0 = 0, py0 = 0, tx0 = 0, ty0 = 0;
+
+      container.addEventListener("mousedown", e => {
+        if (e.button !== 0) return;
+        isPanning = true;
+        moved     = false;
+        px0 = e.clientX; py0 = e.clientY;
+        tx0 = tx;        ty0 = ty;
+        container.classList.add("panning");
+        e.preventDefault();
+      });
+
+      window.addEventListener("mousemove", e => {
+        if (!isPanning) return;
+        const dx = e.clientX - px0;
+        const dy = e.clientY - py0;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+        tx = tx0 + dx;
+        ty = ty0 + dy;
+        applyTransform();
+      });
+
+      window.addEventListener("mouseup", () => {
+        isPanning = false;
+        container.classList.remove("panning");
+      });
+
+      // -- Node click (highlight) -------------------------------------------
       svg.querySelectorAll("g.node").forEach(el => {
         el.addEventListener("click", e => {
+          if (moved) return;
           e.stopPropagation();
           const id = svgIdToNodeId(el.id || "");
           if (id) applyHighlight(id);
         });
       });
 
-      // clicking the SVG background resets
-      svg.addEventListener("click", () => resetHighlight());
+      // -- Background click → reset highlight --------------------------------
+      svg.addEventListener("click", () => {
+        if (moved) return;
+        resetHighlight();
+      });
     }
 
     init().catch(err => console.error("Mermaid init error:", err));
@@ -641,6 +758,43 @@ MERMAID_SOURCE
 </body>
 </html>
 """
+
+
+# ---------------------------------------------------------------------------
+# Mermaid JS bundling
+# ---------------------------------------------------------------------------
+
+_MERMAID_CDN_URL = "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"
+_MERMAID_CACHE_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "mermaid.min.js"
+)
+
+
+def _get_mermaid_js() -> str | None:
+    """Return mermaid.min.js content from local cache, downloading on first use."""
+    if os.path.isfile(_MERMAID_CACHE_PATH):
+        try:
+            with open(_MERMAID_CACHE_PATH, encoding="utf-8") as fh:
+                content = fh.read()
+            if content.strip():
+                return content
+        except OSError:
+            pass
+
+    print("Downloading mermaid.min.js from CDN (one-time cache)...", file=sys.stderr)
+    try:
+        with urllib.request.urlopen(_MERMAID_CDN_URL, timeout=30) as resp:
+            content = resp.read().decode("utf-8")
+    except Exception as exc:
+        print(f"Warning: could not download mermaid.min.js: {exc}", file=sys.stderr)
+        return None
+
+    try:
+        with open(_MERMAID_CACHE_PATH, "w", encoding="utf-8") as fh:
+            fh.write(content)
+    except OSError:
+        pass
+    return content
 
 
 # ---------------------------------------------------------------------------
@@ -668,6 +822,12 @@ def _build_graph_json(nodes: dict[str, str], edges: list[tuple[str, str]]) -> st
     )
 
 
+_CDN_SCRIPT_TAG = (
+    '<!-- Mermaid.js v10 -->\n'
+    '  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>'
+)
+
+
 def generate_html(mermaid_text: str) -> str:
     """
     Parse *mermaid_text* and return a complete, self-contained interactive
@@ -682,8 +842,12 @@ def generate_html(mermaid_text: str) -> str:
     # the element's textContent.
     safe_mermaid = html_module.escape(mermaid_text)
 
+    js_content = _get_mermaid_js()
+    mermaid_js_tag = f"<script>{js_content}</script>" if js_content else _CDN_SCRIPT_TAG
+
     return (
         _HTML_TEMPLATE
+        .replace("MERMAID_JS_TAG", mermaid_js_tag)
         .replace("MERMAID_SOURCE", safe_mermaid)
         .replace("GRAPH_JSON", graph_json)
     )

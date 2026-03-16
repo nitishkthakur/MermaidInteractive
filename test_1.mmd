@@ -1,14 +1,51 @@
 flowchart TD
-    ReadMe[ReadMe Documentation] --> Guides[Guides]
-    ReadMe --> APIRef[API Reference]
+    Root[Documentation Hub] --> Guides[Guides]
+    Root --> API[API Reference]
+    Root --> Examples[Examples & Tutorials]
 
-    Guides --> Editor[Editor UI]
-    Editor --> Slash[Slash Commands]
-    Slash --> Mermaid[Mermaid Diagrams]
-    Slash --> Other[Other Blocks]
+    subgraph SG1["📖 Guides & Features"]
+        Guides --> Editor[Editor UI]
+        Editor --> Keyboard[Keyboard Shortcuts]
+        Keyboard --> NavKeys[Navigation Keys]
+        Keyboard --> EditKeys[Editing Keys]
+        
+        Guides --> Slash[Slash Commands]
+        Slash --> SlashDiagram[Mermaid Diagrams]
+        Slash --> SlashTable[Tables]
+        Slash --> SlashCode[Code Blocks]
+        Slash --> SlashOther[Other Blocks]
+    end
 
-    APIRef --> OpenAPI[OpenAPI Spec]
-    APIRef --> Manual[Manual Editor]
+    subgraph SG2["🔌 API & Integration"]
+        API --> OpenAPI[OpenAPI Specification]
+        OpenAPI --> OpenSchemas[JSON Schemas]
+        OpenAPI --> OpenModels[Data Models]
+        
+        API --> REST[REST Endpoints]
+        REST --> Auth[Authentication]
+        REST --> Methods[HTTP Methods]
+        
+        API --> Manual[Manual Reference]
+        Manual --> Types[Type Definitions]
+        Manual --> Errors[Error Codes]
+    end
 
-    style ReadMe fill:#f9f,stroke:#333,stroke-width:4px
-    style Mermaid fill:#bbf,stroke:#333,stroke-width:2px
+    subgraph SG3["🎓 Examples & Best Practices"]
+        Examples --> Diagrams[Diagram Examples]
+        Diagrams --> Flowcharts[Flowcharts]
+        Diagrams --> Graphs[Graphs & Networks]
+        Diagrams --> States[State Diagrams]
+        
+        Examples --> Patterns[Design Patterns]
+        Patterns --> Architecture[Architecture Patterns]
+        Patterns --> UML[UML Patterns]
+        
+        Examples --> Advanced[Advanced Topics]
+        Advanced --> Performance[Performance Tips]
+        Advanced --> Security[Security Best Practices]
+    end
+
+    style Root fill:#ff9999,stroke:#333,stroke-width:3px
+    style SlashDiagram fill:#99ccff,stroke:#333,stroke-width:2px
+    style Flowcharts fill:#99ff99,stroke:#333,stroke-width:2px
+    style Auth fill:#ffcc99,stroke:#333,stroke-width:2px
