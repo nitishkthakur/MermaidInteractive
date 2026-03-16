@@ -306,6 +306,80 @@ class TestHtmlOutput:
         # The Mermaid source block must HTML-escape angle brackets
         assert "&lt;script&gt;" in html or r"\u003cscript\u003e" in html
 
+    def test_no_header_title_or_hint(self):
+        """The old decorative h1 / hint paragraph must not appear in the output."""
+        html = generate_html("flowchart TD\n  A --> B")
+        assert "<h1>" not in html
+        assert "Interactive Mermaid Diagram" not in html
+        assert "Click a node to highlight" not in html
+
+    def test_download_button_present(self):
+        """A Download PNG button must be present in the generated HTML."""
+        html = generate_html("flowchart TD\n  A --> B")
+        assert "download-btn" in html
+        assert "downloadPNG" in html
+
+    def test_professional_colors_no_orange_or_pink(self):
+        """Old orange (#e65c00) and blue (#0077cc) colors must be gone;
+        professional palette (steelblue, salmon) must be used instead."""
+        html = generate_html("flowchart TD\n  A --> B")
+        assert "#e65c00" not in html
+        assert "#0077cc" not in html
+        assert "steelblue" in html
+        assert "salmon" in html
+
+    def test_container_fills_viewport(self):
+        """The diagram container should use min-height to fill the viewport."""
+        html = generate_html("flowchart TD\n  A --> B")
+        assert "min-height" in html
+        assert "100vh" in html
+
+    def test_subgraph_source_preserved_for_mermaid(self):
+        """Subgraph syntax in the source must be present in the HTML output
+        so that Mermaid.js renders the subgraph visually."""
+        diagram = (
+            "flowchart TD\n"
+            "  A --> B\n"
+            "  subgraph Group1\n"
+            "    B --> C\n"
+            "  end\n"
+        )
+        html = generate_html(diagram)
+        assert "subgraph" in html
+        assert "Group1" in html
+
+
+# ---------------------------------------------------------------------------
+# Subgraph ID registration
+# ---------------------------------------------------------------------------
+
+class TestSubgraphIdRegistration:
+    def test_subgraph_id_registered_as_node(self):
+        """A named subgraph ID should be available in the nodes dict so that
+        edges referencing it (A --> subgraphID) are resolved correctly."""
+        diagram = (
+            "flowchart TD\n"
+            "  subgraph sg1\n"
+            "    A --> B\n"
+            "  end\n"
+            "  C --> sg1\n"
+        )
+        nodes, edges = parse_mermaid(diagram)
+        assert "sg1" in nodes
+        assert ("C", "sg1") in edges
+
+    def test_subgraph_label_not_used_as_id(self):
+        """A subgraph with label syntax `subgraph id[Label]` should register
+        the id only, not the bracketed label."""
+        diagram = (
+            "flowchart TD\n"
+            "  subgraph myGroup[My Group Label]\n"
+            "    X --> Y\n"
+            "  end\n"
+        )
+        nodes, _ = parse_mermaid(diagram)
+        assert "myGroup" in nodes
+
 
 # ---------------------------------------------------------------------------
 # graph LR alias
