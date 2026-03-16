@@ -1,0 +1,16 @@
+flowchart TD
+    User([User]) --> Login{Authenticated?}
+    Login -->|yes| Dashboard[Dashboard]
+    Login -->|no| Error[Login Error]
+    Dashboard --> Profile[Profile Page]
+    Dashboard --> Settings[Settings]
+    Dashboard --> Reports[Reports]
+    Reports --> Sales[Sales Report]
+    Reports --> Traffic[Traffic Report]
+    Settings --> Account[Account Settings]
+    Settings --> Notifications[Notification Preferences]
+
+    classDef highlight fill:#bbf,stroke:#00c,stroke-width:2px
+    classDef error fill:#fbb,stroke:#c00,stroke-width:2px
+    class Dashboard,Profile highlight
+    class Error error

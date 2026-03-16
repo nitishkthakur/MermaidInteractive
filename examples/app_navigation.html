@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Mermaid Diagram</title>
+  <style>
+    /* ── layout ──────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 1.5rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   Arial, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      margin: 0 0 .3rem;
+      font-size: 1.3rem;
+      color: #333;
+    }
+
+    #hint {
+      margin: 0 0 1.2rem;
+      font-size: .85rem;
+      color: #777;
+    }
+
+    #diagram-container {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 16px rgba(0,0,0,.12);
+      padding: 2rem 2.5rem;
+      max-width: 95vw;
+      overflow: auto;
+    }
+
+    /* ── node highlight states ───────────────────────────────────────── */
+    /*
+     * After Mermaid renders, each flowchart node is a <g class="node …">
+     * element.  We add/remove the classes below at run-time.
+     */
+
+    /* smooth transitions on all node shapes */
+    .node { transition: opacity .22s, filter .22s; cursor: pointer; }
+
+    /* selected node — orange outline */
+    .node.mi-selected > rect,
+    .node.mi-selected > circle,
+    .node.mi-selected > ellipse,
+    .node.mi-selected > polygon,
+    .node.mi-selected > path {
+      stroke: #e65c00 !important;
+      stroke-width: 3.5px !important;
+      filter: drop-shadow(0 0 6px rgba(230,92,0,.55));
+    }
+
+    /* ancestor / descendant — blue outline */
+    .node.mi-related > rect,
+    .node.mi-related > circle,
+    .node.mi-related > ellipse,
+    .node.mi-related > polygon,
+    .node.mi-related > path {
+      stroke: #0077cc !important;
+      stroke-width: 2.5px !important;
+      filter: drop-shadow(0 0 4px rgba(0,119,204,.45));
+    }
+
+    /* unrelated nodes — heavily faded */
+    .node.mi-dim { opacity: .18; }
+
+    /* edge dimming */
+    .edgePath.mi-dim,
+    .edgeLabel.mi-dim { opacity: .08; transition: opacity .22s; }
+
+    /* reset button */
+    #reset-btn {
+      margin-top: 1rem;
+      padding: .4rem 1rem;
+      font-size: .85rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      color: #555;
+      display: none;
+    }
+    #reset-btn:hover { background: #f5f5f5; }
+  </style>
+</head>
+<body>
+  <h1>Interactive Mermaid Diagram</h1>
+  <p id="hint">Click a node to highlight its ancestors and descendants.</p>
+  <div id="diagram-container">
+    <pre class="mermaid">
+flowchart TD
+    User([User]) --&gt; Login{Authenticated?}
+    Login --&gt;|yes| Dashboard[Dashboard]
+    Login --&gt;|no| Error[Login Error]
+    Dashboard --&gt; Profile[Profile Page]
+    Dashboard --&gt; Settings[Settings]
+    Dashboard --&gt; Reports[Reports]
+    Reports --&gt; Sales[Sales Report]
+    Reports --&gt; Traffic[Traffic Report]
+    Settings --&gt; Account[Account Settings]
+    Settings --&gt; Notifications[Notification Preferences]
+
+    classDef highlight fill:#bbf,stroke:#00c,stroke-width:2px
+    classDef error fill:#fbb,stroke:#c00,stroke-width:2px
+    class Dashboard,Profile highlight
+    class Error error
+
+    </pre>
+  </div>
+  <button id="reset-btn" onclick="resetHighlight()">&#x21BA;&nbsp;Reset view</button>
+
+  <!-- Mermaid.js v10 -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    // ── graph data injected by Python ────────────────────────────────────
+    const GRAPH = {
+  "nodes": {
+    "User": "User",
+    "Login": "Authenticated?",
+    "Dashboard": "Dashboard",
+    "Error": "Login Error",
+    "Profile": "Profile Page",
+    "Settings": "Settings",
+    "Reports": "Reports",
+    "Sales": "Sales Report",
+    "Traffic": "Traffic Report",
+    "Account": "Account Settings",
+    "Notifications": "Notification Preferences"
+  },
+  "children": {
+    "User": [
+      "Login"
+    ],
+    "Login": [
+      "Dashboard",
+      "Error"
+    ],
+    "Dashboard": [
+      "Profile",
+      "Settings",
+      "Reports"
+    ],
+    "Reports": [
+      "Sales",
+      "Traffic"
+    ],
+    "Settings": [
+      "Account",
+      "Notifications"
+    ]
+  },
+  "parents": {
+    "Login": [
+      "User"
+    ],
+    "Dashboard": [
+      "Login"
+    ],
+    "Error": [
+      "Login"
+    ],
+    "Profile": [
+      "Dashboard"
+    ],
+    "Settings": [
+      "Dashboard"
+    ],
+    "Reports": [
+      "Dashboard"
+    ],
+    "Sales": [
+      "Reports"
+    ],
+    "Traffic": [
+      "Reports"
+    ],
+    "Account": [
+      "Settings"
+    ],
+    "Notifications": [
+      "Settings"
+    ]
+  }
+};
+
+    // ── Mermaid initialisation ───────────────────────────────────────────
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "loose",
+      theme: "default"
+    });
+
+    // ── graph traversal (BFS) ────────────────────────────────────────────
+    /**
+     * Return the Set of all node IDs related to `nodeId`:
+     * the node itself + all ancestors + all descendants.
+     */
+    function getRelated(nodeId) {
+      const related = new Set([nodeId]);
+
+      // forward BFS → descendants
+      let queue = [nodeId];
+      while (queue.length) {
+        const id = queue.shift();
+        for (const child of (GRAPH.children[id] || [])) {
+          if (!related.has(child)) { related.add(child); queue.push(child); }
+        }
+      }
+
+      // reverse BFS → ancestors
+      queue = [nodeId];
+      while (queue.length) {
+        const id = queue.shift();
+        for (const parent of (GRAPH.parents[id] || [])) {
+          if (!related.has(parent)) { related.add(parent); queue.push(parent); }
+        }
+      }
+
+      return related;
+    }
+
+    // ── SVG ↔ node-ID mapping ────────────────────────────────────────────
+    const knownIds = Object.keys(GRAPH.nodes);
+
+    /**
+     * Map a Mermaid SVG element id (e.g. "flowchart-ReadMe-0") back to
+     * the logical node ID (e.g. "ReadMe").
+     * Uses longest-prefix matching to handle IDs that share prefixes.
+     */
+    function svgIdToNodeId(svgId) {
+      if (!svgId) return null;
+
+      // Mermaid v10 pattern: "flowchart-{nodeId}-{n}"
+      const prefix = "flowchart-";
+      if (!svgId.startsWith(prefix)) return null;
+      const rest = svgId.slice(prefix.length);
+
+      let best = null;
+      for (const id of knownIds) {
+        if (!rest.startsWith(id)) continue;
+        const suffix = rest.slice(id.length);
+        if (suffix === "" || /^-\d+$/.test(suffix)) {
+          if (!best || id.length > best.length) best = id;
+        }
+      }
+      return best;
+    }
+
+    /**
+     * Map a Mermaid edge SVG id (e.g. "L-ReadMe-Guides-0") back to
+     * { src, dst } logical node IDs.
+     */
+    function svgEdgeToNodeIds(svgId) {
+      if (!svgId) return null;
+      const prefix = "L-";
+      if (!svgId.startsWith(prefix)) return null;
+      const rest = svgId.slice(prefix.length);
+
+      for (const src of knownIds) {
+        if (!rest.startsWith(src + "-")) continue;
+        const after = rest.slice(src.length + 1);
+        for (const dst of knownIds) {
+          if (!after.startsWith(dst)) continue;
+          const suffix = after.slice(dst.length);
+          if (suffix === "" || /^-\d+$/.test(suffix)) {
+            return { src, dst };
+          }
+        }
+      }
+      return null;
+    }
+
+    // ── highlight / reset ────────────────────────────────────────────────
+    let selectedId = null;
+
+    function resetHighlight() {
+      document.querySelectorAll(".node, .edgePath, .edgeLabel").forEach(el => {
+        el.classList.remove("mi-selected", "mi-related", "mi-dim");
+      });
+      selectedId = null;
+      document.getElementById("reset-btn").style.display = "none";
+    }
+
+    function applyHighlight(nodeId) {
+      // toggle off if same node clicked again
+      if (selectedId === nodeId) { resetHighlight(); return; }
+      selectedId = nodeId;
+
+      const related = getRelated(nodeId);
+
+      // style nodes
+      document.querySelectorAll(".node").forEach(el => {
+        const id = svgIdToNodeId(el.id || "");
+        el.classList.remove("mi-selected", "mi-related", "mi-dim");
+        if (!id) return;
+        if (id === nodeId)        el.classList.add("mi-selected");
+        else if (related.has(id)) el.classList.add("mi-related");
+        else                      el.classList.add("mi-dim");
+      });
+
+      // style edges
+      document.querySelectorAll(".edgePath, .edgeLabel").forEach(el => {
+        el.classList.remove("mi-related", "mi-dim");
+        const ids = svgEdgeToNodeIds(el.id || "");
+        if (!ids) return;
+        if (!(related.has(ids.src) && related.has(ids.dst))) {
+          el.classList.add("mi-dim");
+        }
+      });
+
+      document.getElementById("reset-btn").style.display = "inline-block";
+    }
+
+    // ── attach handlers after Mermaid has rendered ───────────────────────
+    async function init() {
+      await mermaid.run();
+
+      const svg = document.querySelector(".mermaid svg");
+      if (!svg) {
+        console.warn("Mermaid SVG not found — interactive features disabled.");
+        return;
+      }
+
+      // make the SVG responsive
+      svg.removeAttribute("height");
+      svg.style.maxWidth = "100%";
+
+      // attach click handlers to every node <g>
+      svg.querySelectorAll("g.node").forEach(el => {
+        el.addEventListener("click", e => {
+          e.stopPropagation();
+          const id = svgIdToNodeId(el.id || "");
+          if (id) applyHighlight(id);
+        });
+      });
+
+      // clicking the SVG background resets
+      svg.addEventListener("click", () => resetHighlight());
+    }
+
+    init().catch(err => console.error("Mermaid init error:", err));
+  </script>
+</body>
+</html>
