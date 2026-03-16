@@ -3,100 +3,111 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Interactive Mermaid Diagram</title>
+  <title>Mermaid Diagram</title>
   <style>
     /* ── layout ──────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; }
 
-    body {
+    html, body {
       margin: 0;
-      padding: 1.5rem;
+      padding: 0;
+      height: 100%;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                    Arial, sans-serif;
-      background: #f0f2f5;
-      min-height: 100vh;
+      background: #f8f9fa;
+    }
+
+    body {
       display: flex;
       flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── toolbar ──────────────────────────────────────────────────────── */
+    #toolbar {
+      display: flex;
+      justify-content: flex-end;
       align-items: center;
-    }
-
-    h1 {
-      margin: 0 0 .3rem;
-      font-size: 1.3rem;
-      color: #333;
-    }
-
-    #hint {
-      margin: 0 0 1.2rem;
-      font-size: .85rem;
-      color: #777;
-    }
-
-    #diagram-container {
+      gap: .5rem;
+      padding: .75rem 1.25rem;
       background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 2px 16px rgba(0,0,0,.12);
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .tb-btn {
+      padding: .35rem .9rem;
+      font-size: .8rem;
+      font-weight: 500;
+      border: 1px solid #c8c8c8;
+      border-radius: 5px;
+      background: #fff;
+      cursor: pointer;
+      color: #333;
+      letter-spacing: .02em;
+      transition: background .15s, border-color .15s;
+    }
+    .tb-btn:hover { background: #f0f4f8; border-color: steelblue; }
+
+    #reset-btn { display: none; }
+
+    /* ── diagram area ─────────────────────────────────────────────────── */
+    #diagram-container {
+      flex: 1;
+      background: #fff;
+      margin: 1.25rem;
+      border-radius: 8px;
+      box-shadow: 0 1px 8px rgba(0,0,0,.08);
       padding: 2rem 2.5rem;
-      max-width: 95vw;
+      min-height: calc(100vh - 6rem);
       overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    #diagram-container .mermaid {
+      min-width: 600px;
+      width: 100%;
     }
 
     /* ── node highlight states ───────────────────────────────────────── */
-    /*
-     * After Mermaid renders, each flowchart node is a <g class="node …">
-     * element.  We add/remove the classes below at run-time.
-     */
-
-    /* smooth transitions on all node shapes */
     .node { transition: opacity .22s, filter .22s; cursor: pointer; }
 
-    /* selected node — orange outline */
+    /* selected node — salmon outline */
     .node.mi-selected > rect,
     .node.mi-selected > circle,
     .node.mi-selected > ellipse,
     .node.mi-selected > polygon,
     .node.mi-selected > path {
-      stroke: #e65c00 !important;
+      stroke: salmon !important;
       stroke-width: 3.5px !important;
-      filter: drop-shadow(0 0 6px rgba(230,92,0,.55));
+      filter: drop-shadow(0 0 6px rgba(250,128,114,.6));
     }
 
-    /* ancestor / descendant — blue outline */
+    /* ancestor / descendant — steelblue outline */
     .node.mi-related > rect,
     .node.mi-related > circle,
     .node.mi-related > ellipse,
     .node.mi-related > polygon,
     .node.mi-related > path {
-      stroke: #0077cc !important;
+      stroke: steelblue !important;
       stroke-width: 2.5px !important;
-      filter: drop-shadow(0 0 4px rgba(0,119,204,.45));
+      filter: drop-shadow(0 0 4px rgba(70,130,180,.5));
     }
 
     /* unrelated nodes — heavily faded */
-    .node.mi-dim { opacity: .18; }
+    .node.mi-dim { opacity: .15; }
 
     /* edge dimming */
     .edgePath.mi-dim,
     .edgeLabel.mi-dim { opacity: .08; transition: opacity .22s; }
-
-    /* reset button */
-    #reset-btn {
-      margin-top: 1rem;
-      padding: .4rem 1rem;
-      font-size: .85rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      background: #fff;
-      cursor: pointer;
-      color: #555;
-      display: none;
-    }
-    #reset-btn:hover { background: #f5f5f5; }
   </style>
 </head>
 <body>
-  <h1>Interactive Mermaid Diagram</h1>
-  <p id="hint">Click a node to highlight its ancestors and descendants.</p>
+  <div id="toolbar">
+    <button id="download-btn" class="tb-btn" onclick="downloadPNG()">&#x2193;&nbsp;Download PNG</button>
+    <button id="reset-btn" class="tb-btn" onclick="resetHighlight()">&#x21BA;&nbsp;Reset view</button>
+  </div>
   <div id="diagram-container">
     <pre class="mermaid">
 flowchart LR
@@ -115,7 +126,6 @@ flowchart LR
 
     </pre>
   </div>
-  <button id="reset-btn" onclick="resetHighlight()">&#x21BA;&nbsp;Reset view</button>
 
   <!-- Mermaid.js v10 -->
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -331,6 +341,53 @@ flowchart LR
       document.getElementById("reset-btn").style.display = "inline-block";
     }
 
+    // ── download PNG ─────────────────────────────────────────────────────
+    function downloadPNG() {
+      const svgEl = document.querySelector(".mermaid svg");
+      if (!svgEl) return;
+
+      const rect = svgEl.getBoundingClientRect();
+      const w = Math.max(Math.round(rect.width), 400);
+      const h = Math.max(Math.round(rect.height), 300);
+
+      // Clone SVG and set explicit dimensions so the canvas renders correctly
+      const clone = svgEl.cloneNode(true);
+      clone.setAttribute("width", w);
+      clone.setAttribute("height", h);
+      // Ensure a white background is embedded in the SVG
+      const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      bg.setAttribute("width", "100%");
+      bg.setAttribute("height", "100%");
+      bg.setAttribute("fill", "#ffffff");
+      clone.insertBefore(bg, clone.firstChild);
+
+      const svgStr = new XMLSerializer().serializeToString(clone);
+      const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const img = new Image();
+      img.onload = () => {
+        // Render at 2× for crisp high-DPI output
+        const canvas = document.createElement("canvas");
+        canvas.width  = w * 2;
+        canvas.height = h * 2;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(2, 2);
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+
+        const a = document.createElement("a");
+        a.download = "diagram.png";
+        a.href = canvas.toDataURL("image/png");
+        a.click();
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        console.error("Failed to load SVG for PNG export.");
+      };
+      img.src = url;
+    }
+
     // ── attach handlers after Mermaid has rendered ───────────────────────
     async function init() {
       await mermaid.run();
@@ -341,9 +398,10 @@ flowchart LR
         return;
       }
 
-      // make the SVG responsive
+      // make the SVG fill its container responsively
       svg.removeAttribute("height");
-      svg.style.maxWidth = "100%";
+      svg.style.width = "100%";
+      svg.style.minWidth = "600px";
 
       // attach click handlers to every node <g>
       svg.querySelectorAll("g.node").forEach(el => {

@@ -23,13 +23,18 @@
    - Extracts edges (arrow types: `-->`, `---`, `-.->`, `==>`, `<-->`, `~~>`, etc.)
    - Handles labeled edges (pipe syntax: `-->|label|` and text syntax: `-- text -->`)
    - Handles multi-hop chains (e.g., `A --> B --> C`)
-   - **Safety**: Safely ignores `style`, `classDef`, `class`, `linkStyle`, `click`, `subgraph`
+   - **Safety**: Safely ignores `style`, `classDef`, `class`, `linkStyle`, `click`
+   - **Subgraphs**: Registers subgraph IDs as potential nodes; processes all edges inside subgraphs
    - Returns: `(nodes_dict, edges_list)` tuple
 
 2. **HTML Generator** (`generate_html()`)
    - Wraps parsed nodes and edges into a self-contained HTML file
    - Embeds custom JavaScript for click-based highlighting logic
    - Loads Mermaid.js from CDN; no server required
+   - **UI**: Minimalist, professional layout — no decorative title or hint text
+   - **Toolbar**: Top-right toolbar with "Download PNG" and "Reset view" buttons
+   - **Colors**: Professional palette — `steelblue` for related nodes, `salmon` for selected
+   - **Canvas**: Large container (`min-height: calc(100vh - 6rem)`) fills the viewport
    - Output is ready to open in any modern browser
 
 3. **CLI Interface** (`main()`)
@@ -125,9 +130,14 @@ pytest tests/ --cov=mermaid_interactive
 3. Add test case to `TestNodeShapes` class
 
 ### Improve Highlighting Logic
-1. Modify the JavaScript in `generate_html()` function (search for `function highlightNode()`)
+1. Modify the JavaScript in `generate_html()` function (search for `function applyHighlight`)
 2. Test in browser: open generated `.html` and click nodes
 3. Consider adding tests for graph traversal if logic becomes complex
+
+### Modify the Download PNG Feature
+1. Locate `function downloadPNG()` inside `_HTML_TEMPLATE` in `mermaid_interactive.py`
+2. Adjust the Canvas scale or background color as needed
+3. The function uses native browser APIs (no extra dependencies)
 
 ### Handle a New Directive (e.g., custom styling)
 - Current approach: Ignore unknown directives (regex lines skip them)
@@ -139,7 +149,7 @@ pytest tests/ --cov=mermaid_interactive
 ## Known Constraints & Gotchas
 
 1. **Mermaid.js Dependency**: Output HTML requires internet access to load Mermaid.js from CDN
-2. **No Subgraph Support**: `subgraph` directives are currently ignored (not part of graph structure)
+2. **Subgraph Support**: `subgraph` directives are rendered by Mermaid.js natively; subgraph IDs are registered as nodes in the graph data for interactive highlighting (e.g., `A --> subgraphID` edges work)
 3. **No Styling Preservation**: Style directives (`style`, `classDef`, etc.) are intentionally stripped
 4. **Python 3.10+ Only**: Uses match/case or modern string features (verify exact version requirement)
 5. **Single-Direction Edges**: Parser treats `<-->` as a single undirected edge (not two directed edges)
@@ -177,7 +187,7 @@ When working on this project, prioritize in this order:
 2. **Use examples**: Reference diagrams in `examples/` to understand supported syntax
 3. **Test manually**: Generate an HTML and open in browser to verify click behavior
 4. **Read the parser**: The regex logic in lines 30–150 is the project's core
-5. **Check edge cases**: Labeled edges, multi-hop chains, and mixed arrow types
+5. **Check edge cases**: Labeled edges, multi-hop chains, mixed arrow types, and subgraph references
 
 ---
 
