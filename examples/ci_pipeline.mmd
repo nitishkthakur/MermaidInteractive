@@ -1,0 +1,13 @@
+flowchart LR
+    Code[Write Code] --> Commit[git commit]
+    Commit --> Push[git push]
+    Push --> CI{CI Pass?}
+    CI -->|yes| Review[Code Review]
+    CI -->|no| Fix[Fix Errors]
+    Fix --> Commit
+    Review -->|approved| Merge[Merge to main]
+    Review -->|changes requested| Fix
+    Merge --> Deploy[Deploy to Staging]
+    Deploy --> Test{Tests Pass?}
+    Test -->|yes| Release[Release to Production]
+    Test -->|no| Rollback[Rollback]
