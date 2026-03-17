@@ -229,12 +229,21 @@ class ExternalConnectionNode:
         Meaningful source identifier: DSN, server, URL, or query name.
     """
 
-    __slots__ = ("conn_type", "name", "source")
+    __slots__ = ("conn_type", "name", "source", "wb_scope")
 
-    def __init__(self, conn_type: str, name: str, source: str) -> None:
+    def __init__(
+        self,
+        conn_type: str,
+        name: str,
+        source: str,
+        wb_scope: str = "",
+    ) -> None:
         self.conn_type = conn_type
         self.name      = name
         self.source    = source
+        # wb_scope disambiguates connections that live in an upstream workbook.
+        # Leave empty ("") for connections of the currently-analysed file.
+        self.wb_scope  = wb_scope
 
     @property
     def node_id(self) -> str:
@@ -244,10 +253,16 @@ class ExternalConnectionNode:
             "web":        "WEB",
             "oledb":      "OLEDB",
         }.get(self.conn_type, "EXT")
-        # Clean the name/source separately, then join with __
-        raw  = re.sub(r"[^A-Za-z0-9_]", "_", self.source or self.name)
-        raw  = re.sub(r"_+", "_", raw).strip("_") or "unnamed"
-        safe = f"{prefix}__{raw}"
+        # Clean source/name; prefix workbook scope when set so IDs are unique
+        # across workbooks even when two files share the same connection name.
+        raw = re.sub(r"[^A-Za-z0-9_]", "_", self.source or self.name)
+        raw = re.sub(r"_+", "_", raw).strip("_") or "unnamed"
+        if self.wb_scope:
+            scope = re.sub(r"[^A-Za-z0-9_]", "_", self.wb_scope)
+            scope = re.sub(r"_+", "_", scope).strip("_")
+            safe  = f"{prefix}_{scope}__{raw}"
+        else:
+            safe = f"{prefix}__{raw}"
         if safe and not safe[0].isalpha():
             safe = "N_" + safe
         return safe[:80]
@@ -580,6 +595,66 @@ def extract_external_connections(
     return conn_nodes, conn_edges
 
 
+def extract_upstream_file_connections(
+    main_path: str,
+    all_nodes: set[SheetNode],
+) -> dict[str, list["ExternalConnectionNode"]]:
+    """
+    For every external workbook referenced in *all_nodes* (i.e. nodes whose
+    ``workbook`` attribute is not None), check whether that file exists in
+    the **same directory** as *main_path*.  If it does, extract its ODBC /
+    Power Query / Web connections — but **not** its formula-level sheet
+    dependencies.
+
+    Returns ``{workbook_filename: [ExternalConnectionNode]}`` only for files
+    that are both present on disk and have at least one detectable connection.
+    Connection node IDs are scoped to the workbook (via ``wb_scope``) so
+    identically-named connections in different files never collide.
+
+    Only one level of depth is traversed — upstream files of upstream files
+    are not examined.
+    """
+    main_dir = os.path.dirname(os.path.abspath(main_path))
+
+    # Unique external workbook names from formula references
+    upstream_wb_names: set[str] = {
+        n.workbook for n in all_nodes if n.workbook is not None
+    }
+    if not upstream_wb_names:
+        return {}
+
+    result: dict[str, list[ExternalConnectionNode]] = {}
+
+    for wb_name in sorted(upstream_wb_names):  # sorted for reproducibility
+        candidate = os.path.join(main_dir, wb_name)
+        if not os.path.isfile(candidate):
+            continue  # file not in same directory — skip silently
+
+        try:
+            with zipfile.ZipFile(candidate, "r") as zf:
+                raw_conns = _parse_connections_xml(zf)
+        except Exception:
+            continue  # corrupt / not a real xlsx — skip
+
+        if not raw_conns:
+            continue
+
+        scoped: list[ExternalConnectionNode] = []
+        seen_ids: set[str] = set()
+        for cn in raw_conns.values():
+            scoped_cn = ExternalConnectionNode(
+                cn.conn_type, cn.name, cn.source, wb_scope=wb_name
+            )
+            if scoped_cn.node_id not in seen_ids:
+                seen_ids.add(scoped_cn.node_id)
+                scoped.append(scoped_cn)
+
+        if scoped:
+            result[wb_name] = scoped
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Dependency-graph builder
 # ---------------------------------------------------------------------------
@@ -676,6 +751,7 @@ def build_mermaid(
     current_file: str,
     conn_nodes: list["ExternalConnectionNode"] | None = None,
     conn_edges: list[tuple["ExternalConnectionNode", SheetNode]] | None = None,
+    upstream_conn_map: dict[str, list["ExternalConnectionNode"]] | None = None,
 ) -> str:
     """
     Produce a ``flowchart LR`` Mermaid diagram string.
@@ -684,10 +760,16 @@ def build_mermaid(
     The current file's sheets appear first; external workbooks follow in
     alphabetical order.
 
-    *conn_nodes* — all ExternalConnectionNodes to show (including those
-    with no arrows). *conn_edges* — only the ones with a confirmed
-    sheet target.  Colours:
+    *conn_nodes* — current file's ExternalConnectionNodes (including those
+    with no arrows). *conn_edges* — only the current-file ones with a
+    confirmed queryTable/pivotTable target sheet.
 
+    *upstream_conn_map* — ``{workbook_filename: [ExternalConnectionNode]}``
+    for upstream Excel files found on disk.  Their connection nodes are
+    rendered **inside** that workbook's subgraph (no arrows) so it's clear
+    which file they belong to, without cluttering the diagram.
+
+    Node colours:
     - ODBC   → warm orange  (``#f4a261``)
     - OLE DB → amber        (``#e9c46a``)
     - Power Query → forest green (``#52b788``)
@@ -695,17 +777,32 @@ def build_mermaid(
     """
     lines = ["flowchart LR"]
 
-    # Start with explicitly provided nodes; supplement with any from conn_edges
-    # so that callers can pass only conn_edges and still get subgraphs.
-    all_conn_nodes = list(conn_nodes or [])
+    # ── Collect current-file connection nodes ─────────────────────────────
+    # Start with explicitly provided nodes; supplement from conn_edges so
+    # callers that only pass conn_edges still get subgraphs.
+    cur_conn_nodes = list(conn_nodes or [])
     if conn_edges:
-        seen_ids = {cn.node_id for cn in all_conn_nodes}
+        seen_ids = {cn.node_id for cn in cur_conn_nodes}
         for cn, _ in conn_edges:
             if cn.node_id not in seen_ids:
                 seen_ids.add(cn.node_id)
-                all_conn_nodes.append(cn)
+                cur_conn_nodes.append(cn)
+
+    # All connection nodes (current file + upstream files) — used for classDef
+    all_conn_nodes: list[ExternalConnectionNode] = list(cur_conn_nodes)
+    if upstream_conn_map:
+        for cn_list in upstream_conn_map.values():
+            all_conn_nodes.extend(cn_list)
 
     # ── classDef for connection node colours ─────────────────────────────
+    conn_type_order = ["odbc", "oledb", "powerquery", "web"]
+    conn_type_labels = {
+        "odbc":       "ODBC",
+        "oledb":      "OLE DB",
+        "powerquery": "Power Query",
+        "web":        "Web",
+    }
+
     if all_conn_nodes:
         lines += [
             "  classDef odbcNode fill:#f4a261,stroke:#c1440e,color:#1a1a2e",
@@ -714,26 +811,18 @@ def build_mermaid(
             "  classDef webNode fill:#c77dff,stroke:#7b2d8b,color:#fff",
         ]
 
-    # ── Group all connection nodes by type ────────────────────────────────
-    conn_type_order = ["odbc", "oledb", "powerquery", "web"]
-    conn_type_labels = {
-        "odbc":       "ODBC",
-        "oledb":      "OLE DB",
-        "powerquery": "Power Query",
-        "web":        "Web",
-    }
-    by_type: dict[str, list[ExternalConnectionNode]] = {}
-    for cn in all_conn_nodes:
-        by_type.setdefault(cn.conn_type, []).append(cn)
+    # ── Current-file connection subgraphs (before sheet subgraphs) ────────
+    cur_by_type: dict[str, list[ExternalConnectionNode]] = {}
+    for cn in cur_conn_nodes:
+        cur_by_type.setdefault(cn.conn_type, []).append(cn)
 
-    # ── Connection subgraphs (rendered before sheet subgraphs) ────────────
     for ct in conn_type_order:
-        if ct not in by_type:
+        if ct not in cur_by_type:
             continue
         sg_label = conn_type_labels.get(ct, ct)
         sg_id    = f"SG_CONN_{ct.upper()}"
         lines.append(f'  subgraph {sg_id}["{sg_label} Connections"]')
-        for cn in sorted(by_type[ct], key=lambda c: c.node_id):
+        for cn in sorted(cur_by_type[ct], key=lambda c: c.node_id):
             safe_label = cn.label.replace('"', "'")
             lines.append(f'    {cn.node_id}["{safe_label}"]')
         lines.append("  end")
@@ -761,6 +850,15 @@ def build_mermaid(
         for node in sheets:
             safe_sheet = node.sheet.replace('"', "'")
             lines.append(f'    {node.node_id}["{safe_sheet}"]')
+
+        # Upstream-file connections appear inside this workbook's subgraph.
+        # No arrows are drawn — the subgraph context makes the relationship
+        # clear without crowding the diagram.
+        if wb_name is not None and upstream_conn_map and wb_name in upstream_conn_map:
+            for cn in sorted(upstream_conn_map[wb_name], key=lambda c: c.node_id):
+                safe_cn_label = cn.label.replace('"', "'")
+                lines.append(f'    {cn.node_id}["{safe_cn_label}"]')
+
         lines.append("  end")
 
     # ── Emit sheet-to-sheet edges ─────────────────────────────────────────
@@ -769,20 +867,26 @@ def build_mermaid(
     for src, dst in sorted(edges, key=lambda e: (e[0].node_id, e[1].node_id)):
         lines.append(f"  {src.node_id} --> {dst.node_id}")
 
-    # ── Emit connection → sheet edges ─────────────────────────────────────
+    # ── Emit connection → sheet edges (current file only) ─────────────────
     if conn_edges:
         lines.append("")
         for cn, sn in sorted(conn_edges, key=lambda e: (e[0].node_id, e[1].node_id)):
             lines.append(f"  {cn.node_id} --> {sn.node_id}")
 
-    # ── Apply CSS classes to connection nodes ─────────────────────────────
+    # ── Apply CSS classes to ALL connection nodes ─────────────────────────
     if all_conn_nodes:
+        all_by_type: dict[str, list[ExternalConnectionNode]] = {}
+        for cn in all_conn_nodes:
+            all_by_type.setdefault(cn.conn_type, []).append(cn)
         lines.append("")
         for ct in conn_type_order:
-            if ct not in by_type:
+            if ct not in all_by_type:
                 continue
-            cls = by_type[ct][0].mermaid_class  # all nodes of same type share class
-            ids = ",".join(cn.node_id for cn in sorted(by_type[ct], key=lambda c: c.node_id))
+            cls = all_by_type[ct][0].mermaid_class
+            ids = ",".join(
+                cn.node_id
+                for cn in sorted(all_by_type[ct], key=lambda c: c.node_id)
+            )
             lines.append(f"  class {ids} {cls}")
 
     return "\n".join(lines)
@@ -873,9 +977,20 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
 
+    upstream_conn_map = extract_upstream_file_connections(wb_path, nodes)
+    if upstream_conn_map:
+        n_files = len(upstream_conn_map)
+        n_conns = sum(len(v) for v in upstream_conn_map.values())
+        print(
+            f"Found {n_files} upstream file(s) on disk with "
+            f"{n_conns} external connection(s) total.",
+            file=sys.stderr,
+        )
+
     mermaid_text  = build_mermaid(
         nodes, edges, current_file=title,
         conn_nodes=conn_nodes, conn_edges=conn_edges,
+        upstream_conn_map=upstream_conn_map,
     )
     html_content  = generate_html(mermaid_text, title=title)
 

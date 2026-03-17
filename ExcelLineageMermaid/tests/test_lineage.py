@@ -29,6 +29,7 @@ from excel_lineage import (
     build_dependency_graph,
     build_mermaid,
     extract_external_connections,
+    extract_upstream_file_connections,
     generate_html,
 )
 
@@ -988,3 +989,292 @@ class TestExtractExternalConnections:
             assert "PQ__" in html or "pqNode" in html or "Power Query" in html
         finally:
             os.unlink(path)
+
+
+# ===========================================================================
+# 10. TestExternalConnectionNode wb_scope
+# ===========================================================================
+
+class TestExternalConnectionNodeWbScope:
+    def test_wb_scope_changes_node_id(self):
+        a = ExternalConnectionNode("odbc", "SalesDB", "PROD-SQL")
+        b = ExternalConnectionNode("odbc", "SalesDB", "PROD-SQL", wb_scope="rates.xlsx")
+        assert a.node_id != b.node_id
+
+    def test_scoped_node_id_contains_wb_fragment(self):
+        cn = ExternalConnectionNode("odbc", "DB", "DB", wb_scope="Upstream.xlsx")
+        assert "Upstream" in cn.node_id or "upstream" in cn.node_id.lower()
+
+    def test_no_scope_gives_double_underscore_prefix(self):
+        cn = ExternalConnectionNode("odbc", "DSN1", "DSN1")
+        assert "ODBC__" in cn.node_id
+
+    def test_scoped_node_id_is_valid_mermaid_id(self):
+        cn = ExternalConnectionNode("powerquery", "My Query", "My Query",
+                                    wb_scope="rates (2025).xlsx")
+        assert re.match(r"^[A-Za-z][A-Za-z0-9_]*$", cn.node_id)
+
+    def test_two_scoped_nodes_same_source_different_wb_differ(self):
+        a = ExternalConnectionNode("odbc", "DB", "PROD", wb_scope="file1.xlsx")
+        b = ExternalConnectionNode("odbc", "DB", "PROD", wb_scope="file2.xlsx")
+        assert a.node_id != b.node_id
+
+    def test_label_unaffected_by_wb_scope(self):
+        a = ExternalConnectionNode("odbc", "SalesDB", "PROD-SQL")
+        b = ExternalConnectionNode("odbc", "SalesDB", "PROD-SQL", wb_scope="x.xlsx")
+        assert a.label == b.label
+
+    def test_hash_differs_with_scope(self):
+        a = ExternalConnectionNode("odbc", "DB", "DB")
+        b = ExternalConnectionNode("odbc", "DB", "DB", wb_scope="x.xlsx")
+        assert hash(a) != hash(b)
+
+
+# ===========================================================================
+# 11. TestExtractUpstreamFileConnections
+# ===========================================================================
+
+def _make_xlsx_pair(
+    main_sheets: dict[str, dict],
+    upstream_name: str,
+    upstream_sheets: list[str],
+    upstream_connections_xml: str,
+    same_dir: bool = True,
+) -> tuple[str, str]:
+    """
+    Create two xlsx files.  The main file has formula refs to upstream_name.
+    Returns (main_path, upstream_path).  Both are in the same temp dir when
+    same_dir=True.
+    """
+    import io, tempfile, zipfile as zf_mod
+
+    td = tempfile.mkdtemp()
+
+    # ── upstream file ──────────────────────────────────────────────────────
+    up_wb = openpyxl.Workbook()
+    up_wb.remove(up_wb.active)
+    for s in upstream_sheets:
+        up_wb.create_sheet(s)
+    up_buf = io.BytesIO()
+    up_wb.save(up_buf)
+    up_buf.seek(0)
+    raw_up = up_buf.read()
+
+    # Inject connections.xml into upstream if provided
+    if upstream_connections_xml:
+        in_b  = io.BytesIO(raw_up)
+        out_b = io.BytesIO()
+        with zf_mod.ZipFile(in_b, "r") as zin, \
+             zf_mod.ZipFile(out_b, "w", zf_mod.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                zout.writestr(item, zin.read(item.filename))
+            zout.writestr("xl/connections.xml", upstream_connections_xml)
+        raw_up = out_b.getvalue()
+
+    if same_dir:
+        up_path = os.path.join(td, upstream_name)
+    else:
+        up_path = os.path.join(tempfile.mkdtemp(), upstream_name)
+
+    with open(up_path, "wb") as fh:
+        fh.write(raw_up)
+
+    # ── main file (references upstream via formula) ────────────────────────
+    main_wb = openpyxl.Workbook()
+    main_wb.remove(main_wb.active)
+    ws = main_wb.create_sheet("Sheet1")
+    # Formula referencing upstream_name, first sheet
+    first_sheet = upstream_sheets[0] if upstream_sheets else "Sheet1"
+    ws.cell(1, 1, f"=[{upstream_name}]{first_sheet}!A1")
+    main_buf = io.BytesIO()
+    main_wb.save(main_buf)
+    main_path = os.path.join(td, "main.xlsx")
+    with open(main_path, "wb") as fh:
+        fh.write(main_buf.getvalue())
+
+    return main_path, up_path
+
+
+_ODBC_XML = """\
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<connections xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <connection id="1" name="SalesDB" type="1" refreshedVersion="3">
+    <dbPr connection="DSN=SALES_PROD;UID=reader"/>
+  </connection>
+</connections>"""
+
+_PQ_XML = """\
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<connections xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <connection id="2" name="Query - Invoices" type="5" refreshedVersion="6">
+    <dbPr connection="Provider=Microsoft.Mashup.OleDb.1;Data Source=$Workbook$;Location=Invoices"/>
+    <extLst><ext uri="{DE250136-89BD-433C-8126-D09CA5730AF9}"/></extLst>
+  </connection>
+</connections>"""
+
+
+class TestExtractUpstreamFileConnections:
+
+    def test_returns_empty_when_no_ext_refs(self):
+        """No external workbook refs → nothing to look up."""
+        path = make_xlsx({"Sheet1": {(1, 1): "=SUM(A2:A3)"}})
+        try:
+            nodes, _ = build_dependency_graph(path)
+            result = extract_upstream_file_connections(path, nodes)
+            assert result == {}
+        finally:
+            os.unlink(path)
+
+    def test_returns_empty_when_upstream_not_on_disk(self):
+        """Upstream file is referenced but not in same folder."""
+        main_path, up_path = _make_xlsx_pair(
+            {}, "rates.xlsx", ["Data"], _ODBC_XML, same_dir=False
+        )
+        try:
+            nodes, _ = build_dependency_graph(main_path)
+            result = extract_upstream_file_connections(main_path, nodes)
+            assert result == {}
+        finally:
+            import shutil
+            shutil.rmtree(os.path.dirname(main_path), ignore_errors=True)
+            shutil.rmtree(os.path.dirname(up_path), ignore_errors=True)
+
+    def test_detects_odbc_in_upstream(self):
+        main_path, _ = _make_xlsx_pair(
+            {}, "rates.xlsx", ["Data"], _ODBC_XML
+        )
+        try:
+            nodes, _ = build_dependency_graph(main_path)
+            result = extract_upstream_file_connections(main_path, nodes)
+            assert "rates.xlsx" in result
+            types = {cn.conn_type for cn in result["rates.xlsx"]}
+            assert "odbc" in types
+        finally:
+            import shutil
+            shutil.rmtree(os.path.dirname(main_path), ignore_errors=True)
+
+    def test_detects_pq_in_upstream(self):
+        main_path, _ = _make_xlsx_pair(
+            {}, "upstream.xlsx", ["Sheet1"], _PQ_XML
+        )
+        try:
+            nodes, _ = build_dependency_graph(main_path)
+            result = extract_upstream_file_connections(main_path, nodes)
+            assert "upstream.xlsx" in result
+            types = {cn.conn_type for cn in result["upstream.xlsx"]}
+            assert "powerquery" in types
+        finally:
+            import shutil
+            shutil.rmtree(os.path.dirname(main_path), ignore_errors=True)
+
+    def test_node_ids_are_scoped_to_wb(self):
+        """Scoped IDs must not match the plain (unscoped) node ID."""
+        main_path, _ = _make_xlsx_pair(
+            {}, "rates.xlsx", ["Data"], _ODBC_XML
+        )
+        try:
+            nodes, _ = build_dependency_graph(main_path)
+            result = extract_upstream_file_connections(main_path, nodes)
+            for cn in result.get("rates.xlsx", []):
+                assert cn.wb_scope == "rates.xlsx"
+                # Scoped ID should differ from a plain version of the same name
+                plain = ExternalConnectionNode(cn.conn_type, cn.name, cn.source)
+                assert cn.node_id != plain.node_id
+        finally:
+            import shutil
+            shutil.rmtree(os.path.dirname(main_path), ignore_errors=True)
+
+    def test_returns_empty_when_upstream_has_no_connections(self):
+        """Upstream file exists but has no xl/connections.xml."""
+        main_path, _ = _make_xlsx_pair(
+            {}, "empty_upstream.xlsx", ["Sheet1"], ""
+        )
+        try:
+            nodes, _ = build_dependency_graph(main_path)
+            result = extract_upstream_file_connections(main_path, nodes)
+            assert result == {}
+        finally:
+            import shutil
+            shutil.rmtree(os.path.dirname(main_path), ignore_errors=True)
+
+    def test_build_mermaid_puts_upstream_conns_in_ext_subgraph(self):
+        main_path, _ = _make_xlsx_pair(
+            {}, "rates.xlsx", ["Data"], _ODBC_XML
+        )
+        try:
+            nodes, edges = build_dependency_graph(main_path)
+            upstream_conn_map = extract_upstream_file_connections(main_path, nodes)
+            mmd = build_mermaid(nodes, edges, "main.xlsx",
+                                upstream_conn_map=upstream_conn_map)
+            # The upstream conn node must appear inside the rates.xlsx subgraph
+            sg_start = mmd.index('subgraph SG_EXT__rates_xlsx')
+            sg_end   = mmd.index("  end", sg_start)
+            subgraph_block = mmd[sg_start:sg_end]
+            assert "ODBC_rates_xlsx__SALES_PROD" in subgraph_block or \
+                   any(cn.node_id in subgraph_block
+                       for cn in upstream_conn_map.get("rates.xlsx", []))
+        finally:
+            import shutil
+            shutil.rmtree(os.path.dirname(main_path), ignore_errors=True)
+
+    def test_build_mermaid_no_arrows_for_upstream_conns(self):
+        """Upstream file connections must not generate any --> edges."""
+        main_path, _ = _make_xlsx_pair(
+            {}, "rates.xlsx", ["Data"], _ODBC_XML
+        )
+        try:
+            nodes, edges = build_dependency_graph(main_path)
+            upstream_conn_map = extract_upstream_file_connections(main_path, nodes)
+            mmd = build_mermaid(nodes, edges, "main.xlsx",
+                                upstream_conn_map=upstream_conn_map)
+            # Collect all upstream conn node IDs
+            up_ids = {cn.node_id
+                      for cn_list in upstream_conn_map.values()
+                      for cn in cn_list}
+            # None of those IDs should appear as the source of a --> edge
+            for line in mmd.splitlines():
+                line = line.strip()
+                if "-->" in line:
+                    src = line.split("-->")[0].strip()
+                    assert src not in up_ids, \
+                        f"Upstream conn node {src!r} has an unexpected arrow"
+        finally:
+            import shutil
+            shutil.rmtree(os.path.dirname(main_path), ignore_errors=True)
+
+    def test_class_applied_to_upstream_conn_nodes(self):
+        """CSS class statement must include upstream connection nodes."""
+        main_path, _ = _make_xlsx_pair(
+            {}, "rates.xlsx", ["Data"], _ODBC_XML
+        )
+        try:
+            nodes, edges = build_dependency_graph(main_path)
+            upstream_conn_map = extract_upstream_file_connections(main_path, nodes)
+            mmd = build_mermaid(nodes, edges, "main.xlsx",
+                                upstream_conn_map=upstream_conn_map)
+            for cn in upstream_conn_map.get("rates.xlsx", []):
+                assert cn.node_id in mmd
+                assert "odbcNode" in mmd
+        finally:
+            import shutil
+            shutil.rmtree(os.path.dirname(main_path), ignore_errors=True)
+
+    def test_html_includes_upstream_conn_node(self):
+        main_path, _ = _make_xlsx_pair(
+            {}, "rates.xlsx", ["Data"], _ODBC_XML
+        )
+        try:
+            nodes, edges = build_dependency_graph(main_path)
+            upstream_conn_map = extract_upstream_file_connections(main_path, nodes)
+            mmd  = build_mermaid(nodes, edges, "main.xlsx",
+                                 upstream_conn_map=upstream_conn_map)
+            html = generate_html(mmd, title="main.xlsx")
+            assert html.startswith("<!DOCTYPE html>")
+            assert any(
+                cn.node_id in html
+                for cn_list in upstream_conn_map.values()
+                for cn in cn_list
+            )
+        finally:
+            import shutil
+            shutil.rmtree(os.path.dirname(main_path), ignore_errors=True)
