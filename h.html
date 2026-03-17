@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mermaid Diagram</title>
+  <title>Lineage — test_formulae.xlsx</title>
   <style>
     /* ── layout ──────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; }
@@ -131,57 +131,97 @@
   </div>
   <div id="diagram-container">
     <pre class="mermaid">
-flowchart TD
-    Root[Documentation Hub] --&gt; Guides[Guides]
-    Root --&gt; API[API Reference]
-    Root --&gt; Examples[Examples &amp; Tutorials]
+flowchart LR
+  classDef odbcNode fill:#f4a261,stroke:#c1440e,color:#1a1a2e
+  classDef oledbNode fill:#e9c46a,stroke:#b5830d,color:#1a1a2e
+  classDef pqNode fill:#52b788,stroke:#1b4332,color:#fff
+  classDef webNode fill:#c77dff,stroke:#7b2d8b,color:#fff
+  subgraph SG_CONN_ODBC[&quot;ODBC Connections&quot;]
+    ODBC__AnalyticsPG[&quot;Analytics_PG_ODBC\n(AnalyticsPG)&quot;]
+    ODBC__FinanceDB[&quot;FinanceDB_ODBC\n(FinanceDB)&quot;]
+    ODBC__SalesDB_PROD[&quot;SalesDB_ODBC\n(SalesDB_PROD)&quot;]
+  end
+  subgraph SG_CONN_OLEDB[&quot;OLE DB Connections&quot;]
+    OLEDB__Query_BudgetActuals[&quot;Query - BudgetActuals&quot;]
+    OLEDB__Query_CustomerMetrics[&quot;Query - CustomerMetrics&quot;]
+    OLEDB__Query_ExchangeRates[&quot;Query - ExchangeRates&quot;]
+    OLEDB__Query_Products[&quot;Query - Products&quot;]
+  end
+  subgraph SG_CUR[&quot;test_formulae.xlsx&quot;]
+    CUR__Assumptions[&quot;Assumptions&quot;]
+    CUR__CashFlow[&quot;CashFlow&quot;]
+    CUR__COGS[&quot;COGS&quot;]
+    CUR__EBITDA[&quot;EBITDA&quot;]
+    CUR__NetIncome[&quot;NetIncome&quot;]
+    CUR__OpEx[&quot;OpEx&quot;]
+    CUR__RawData[&quot;RawData&quot;]
+    CUR__Revenue[&quot;Revenue&quot;]
+    CUR__Summary[&quot;Summary&quot;]
+    CUR__Tax[&quot;Tax&quot;]
+  end
+  subgraph SG_EXT__Budget_2026_xlsx[&quot;Budget_2026.xlsx&quot;]
+    EXT__Budget_2026_xlsx__Forecast[&quot;Forecast&quot;]
+  end
+  subgraph SG_EXT__Capex_Schedule_xlsx[&quot;Capex_Schedule.xlsx&quot;]
+    EXT__Capex_Schedule_xlsx__Plan[&quot;Plan&quot;]
+  end
+  subgraph SG_EXT__HR_Model_xlsx[&quot;HR_Model.xlsx&quot;]
+    EXT__HR_Model_xlsx__Headcount[&quot;Headcount&quot;]
+  end
+  subgraph SG_EXT__Industry_Benchmarks_xlsx[&quot;Industry_Benchmarks.xlsx&quot;]
+    EXT__Industry_Benchmarks_xlsx__EBITDA[&quot;EBITDA&quot;]
+  end
+  subgraph SG_EXT__Prior_Year_xlsx[&quot;Prior_Year.xlsx&quot;]
+    EXT__Prior_Year_xlsx__Summary[&quot;Summary&quot;]
+  end
+  subgraph SG_EXT__Suppliers_xlsx[&quot;Suppliers.xlsx&quot;]
+    EXT__Suppliers_xlsx__Costs[&quot;Costs&quot;]
+  end
+  subgraph SG_EXT__Tax_Model_xlsx[&quot;Tax_Model.xlsx&quot;]
+    EXT__Tax_Model_xlsx__Rates[&quot;Rates&quot;]
+  end
 
-    subgraph SG1[&quot;📖 Guides &amp; Features&quot;]
-        Guides --&gt; Editor[Editor UI]
-        Editor --&gt; Keyboard[Keyboard Shortcuts]
-        Keyboard --&gt; NavKeys[Navigation Keys]
-        Keyboard --&gt; EditKeys[Editing Keys]
-        
-        Guides --&gt; Slash[Slash Commands]
-        Slash --&gt; SlashDiagram[Mermaid Diagrams]
-        Slash --&gt; SlashTable[Tables]
-        Slash --&gt; SlashCode[Code Blocks]
-        Slash --&gt; SlashOther[Other Blocks]
-    end
+  CUR__Assumptions --&gt; CUR__COGS
+  CUR__Assumptions --&gt; CUR__CashFlow
+  CUR__Assumptions --&gt; CUR__EBITDA
+  CUR__Assumptions --&gt; CUR__NetIncome
+  CUR__Assumptions --&gt; CUR__OpEx
+  CUR__Assumptions --&gt; CUR__Revenue
+  CUR__Assumptions --&gt; CUR__Summary
+  CUR__Assumptions --&gt; CUR__Tax
+  CUR__COGS --&gt; CUR__CashFlow
+  CUR__COGS --&gt; CUR__EBITDA
+  CUR__COGS --&gt; CUR__Summary
+  CUR__CashFlow --&gt; CUR__Summary
+  CUR__EBITDA --&gt; CUR__CashFlow
+  CUR__EBITDA --&gt; CUR__NetIncome
+  CUR__EBITDA --&gt; CUR__Summary
+  CUR__EBITDA --&gt; CUR__Tax
+  CUR__NetIncome --&gt; CUR__CashFlow
+  CUR__NetIncome --&gt; CUR__Summary
+  CUR__OpEx --&gt; CUR__CashFlow
+  CUR__OpEx --&gt; CUR__EBITDA
+  CUR__OpEx --&gt; CUR__Summary
+  CUR__RawData --&gt; CUR__COGS
+  CUR__RawData --&gt; CUR__Revenue
+  CUR__Revenue --&gt; CUR__COGS
+  CUR__Revenue --&gt; CUR__CashFlow
+  CUR__Revenue --&gt; CUR__EBITDA
+  CUR__Revenue --&gt; CUR__NetIncome
+  CUR__Revenue --&gt; CUR__OpEx
+  CUR__Revenue --&gt; CUR__Summary
+  CUR__Tax --&gt; CUR__NetIncome
+  CUR__Tax --&gt; CUR__Summary
+  EXT__Budget_2026_xlsx__Forecast --&gt; CUR__Revenue
+  EXT__Capex_Schedule_xlsx__Plan --&gt; CUR__CashFlow
+  EXT__HR_Model_xlsx__Headcount --&gt; CUR__OpEx
+  EXT__Industry_Benchmarks_xlsx__EBITDA --&gt; CUR__EBITDA
+  EXT__Prior_Year_xlsx__Summary --&gt; CUR__Summary
+  EXT__Suppliers_xlsx__Costs --&gt; CUR__COGS
+  EXT__Tax_Model_xlsx__Rates --&gt; CUR__Tax
 
-    subgraph SG2[&quot;🔌 API &amp; Integration&quot;]
-        API --&gt; OpenAPI[OpenAPI Specification]
-        OpenAPI --&gt; OpenSchemas[JSON Schemas]
-        OpenAPI --&gt; OpenModels[Data Models]
-        
-        API --&gt; REST[REST Endpoints]
-        REST --&gt; Auth[Authentication]
-        REST --&gt; Methods[HTTP Methods]
-        
-        API --&gt; Manual[Manual Reference]
-        Manual --&gt; Types[Type Definitions]
-        Manual --&gt; Errors[Error Codes]
-    end
-
-    subgraph SG3[&quot;🎓 Examples &amp; Best Practices&quot;]
-        Examples --&gt; Diagrams[Diagram Examples]
-        Diagrams --&gt; Flowcharts[Flowcharts]
-        Diagrams --&gt; Graphs[Graphs &amp; Networks]
-        Diagrams --&gt; States[State Diagrams]
-        
-        Examples --&gt; Patterns[Design Patterns]
-        Patterns --&gt; Architecture[Architecture Patterns]
-        Patterns --&gt; UML[UML Patterns]
-        
-        Examples --&gt; Advanced[Advanced Topics]
-        Advanced --&gt; Performance[Performance Tips]
-        Advanced --&gt; Security[Security Best Practices]
-    end
-
-    style Root fill:#ff9999,stroke:#333,stroke-width:3px
-    style SlashDiagram fill:#99ccff,stroke:#333,stroke-width:2px
-    style Flowcharts fill:#99ff99,stroke:#333,stroke-width:2px
-    style Auth fill:#ffcc99,stroke:#333,stroke-width:2px
+  class ODBC__AnalyticsPG,ODBC__FinanceDB,ODBC__SalesDB_PROD odbcNode
+  class OLEDB__Query_BudgetActuals,OLEDB__Query_CustomerMetrics,OLEDB__Query_ExchangeRates,OLEDB__Query_Products oledbNode
     </pre>
   </div>
 
@@ -2219,194 +2259,167 @@ Expecting `+Ze.join(", ")+", got '"+(this.terminals_[Pe]||Pe)+"'":At="Parse erro
     // ── graph data injected by Python ────────────────────────────────────
     const GRAPH = {
   "nodes": {
-    "Root": "Documentation Hub",
-    "Guides": "Guides",
-    "API": "API Reference",
-    "Examples": "Examples \u0026 Tutorials",
-    "SG1": "SG1",
-    "Editor": "Editor UI",
-    "Keyboard": "Keyboard Shortcuts",
-    "NavKeys": "Navigation Keys",
-    "EditKeys": "Editing Keys",
-    "Slash": "Slash Commands",
-    "SlashDiagram": "Mermaid Diagrams",
-    "SlashTable": "Tables",
-    "SlashCode": "Code Blocks",
-    "SlashOther": "Other Blocks",
-    "SG2": "SG2",
-    "OpenAPI": "OpenAPI Specification",
-    "OpenSchemas": "JSON Schemas",
-    "OpenModels": "Data Models",
-    "REST": "REST Endpoints",
-    "Auth": "Authentication",
-    "Methods": "HTTP Methods",
-    "Manual": "Manual Reference",
-    "Types": "Type Definitions",
-    "Errors": "Error Codes",
-    "SG3": "SG3",
-    "Diagrams": "Diagram Examples",
-    "Flowcharts": "Flowcharts",
-    "Graphs": "Graphs \u0026 Networks",
-    "States": "State Diagrams",
-    "Patterns": "Design Patterns",
-    "Architecture": "Architecture Patterns",
-    "UML": "UML Patterns",
-    "Advanced": "Advanced Topics",
-    "Performance": "Performance Tips",
-    "Security": "Security Best Practices"
+    "SG_CONN_ODBC": "SG_CONN_ODBC",
+    "ODBC__AnalyticsPG": "Analytics_PG_ODBC\\n(AnalyticsPG)",
+    "ODBC__FinanceDB": "FinanceDB_ODBC\\n(FinanceDB)",
+    "ODBC__SalesDB_PROD": "SalesDB_ODBC\\n(SalesDB_PROD)",
+    "SG_CONN_OLEDB": "SG_CONN_OLEDB",
+    "OLEDB__Query_BudgetActuals": "Query - BudgetActuals",
+    "OLEDB__Query_CustomerMetrics": "Query - CustomerMetrics",
+    "OLEDB__Query_ExchangeRates": "Query - ExchangeRates",
+    "OLEDB__Query_Products": "Query - Products",
+    "SG_CUR": "SG_CUR",
+    "CUR__Assumptions": "Assumptions",
+    "CUR__CashFlow": "CashFlow",
+    "CUR__COGS": "COGS",
+    "CUR__EBITDA": "EBITDA",
+    "CUR__NetIncome": "NetIncome",
+    "CUR__OpEx": "OpEx",
+    "CUR__RawData": "RawData",
+    "CUR__Revenue": "Revenue",
+    "CUR__Summary": "Summary",
+    "CUR__Tax": "Tax",
+    "SG_EXT__Budget_2026_xlsx": "SG_EXT__Budget_2026_xlsx",
+    "EXT__Budget_2026_xlsx__Forecast": "Forecast",
+    "SG_EXT__Capex_Schedule_xlsx": "SG_EXT__Capex_Schedule_xlsx",
+    "EXT__Capex_Schedule_xlsx__Plan": "Plan",
+    "SG_EXT__HR_Model_xlsx": "SG_EXT__HR_Model_xlsx",
+    "EXT__HR_Model_xlsx__Headcount": "Headcount",
+    "SG_EXT__Industry_Benchmarks_xlsx": "SG_EXT__Industry_Benchmarks_xlsx",
+    "EXT__Industry_Benchmarks_xlsx__EBITDA": "EBITDA",
+    "SG_EXT__Prior_Year_xlsx": "SG_EXT__Prior_Year_xlsx",
+    "EXT__Prior_Year_xlsx__Summary": "Summary",
+    "SG_EXT__Suppliers_xlsx": "SG_EXT__Suppliers_xlsx",
+    "EXT__Suppliers_xlsx__Costs": "Costs",
+    "SG_EXT__Tax_Model_xlsx": "SG_EXT__Tax_Model_xlsx",
+    "EXT__Tax_Model_xlsx__Rates": "Rates"
   },
   "children": {
-    "Root": [
-      "Guides",
-      "API",
-      "Examples"
+    "CUR__Assumptions": [
+      "CUR__COGS",
+      "CUR__CashFlow",
+      "CUR__EBITDA",
+      "CUR__NetIncome",
+      "CUR__OpEx",
+      "CUR__Revenue",
+      "CUR__Summary",
+      "CUR__Tax"
     ],
-    "Guides": [
-      "Editor",
-      "Slash"
+    "CUR__COGS": [
+      "CUR__CashFlow",
+      "CUR__EBITDA",
+      "CUR__Summary"
     ],
-    "Editor": [
-      "Keyboard"
+    "CUR__CashFlow": [
+      "CUR__Summary"
     ],
-    "Keyboard": [
-      "NavKeys",
-      "EditKeys"
+    "CUR__EBITDA": [
+      "CUR__CashFlow",
+      "CUR__NetIncome",
+      "CUR__Summary",
+      "CUR__Tax"
     ],
-    "Slash": [
-      "SlashDiagram",
-      "SlashTable",
-      "SlashCode",
-      "SlashOther"
+    "CUR__NetIncome": [
+      "CUR__CashFlow",
+      "CUR__Summary"
     ],
-    "API": [
-      "OpenAPI",
-      "REST",
-      "Manual"
+    "CUR__OpEx": [
+      "CUR__CashFlow",
+      "CUR__EBITDA",
+      "CUR__Summary"
     ],
-    "OpenAPI": [
-      "OpenSchemas",
-      "OpenModels"
+    "CUR__RawData": [
+      "CUR__COGS",
+      "CUR__Revenue"
     ],
-    "REST": [
-      "Auth",
-      "Methods"
+    "CUR__Revenue": [
+      "CUR__COGS",
+      "CUR__CashFlow",
+      "CUR__EBITDA",
+      "CUR__NetIncome",
+      "CUR__OpEx",
+      "CUR__Summary"
     ],
-    "Manual": [
-      "Types",
-      "Errors"
+    "CUR__Tax": [
+      "CUR__NetIncome",
+      "CUR__Summary"
     ],
-    "Examples": [
-      "Diagrams",
-      "Patterns",
-      "Advanced"
+    "EXT__Budget_2026_xlsx__Forecast": [
+      "CUR__Revenue"
     ],
-    "Diagrams": [
-      "Flowcharts",
-      "Graphs",
-      "States"
+    "EXT__Capex_Schedule_xlsx__Plan": [
+      "CUR__CashFlow"
     ],
-    "Patterns": [
-      "Architecture",
-      "UML"
+    "EXT__HR_Model_xlsx__Headcount": [
+      "CUR__OpEx"
     ],
-    "Advanced": [
-      "Performance",
-      "Security"
+    "EXT__Industry_Benchmarks_xlsx__EBITDA": [
+      "CUR__EBITDA"
+    ],
+    "EXT__Prior_Year_xlsx__Summary": [
+      "CUR__Summary"
+    ],
+    "EXT__Suppliers_xlsx__Costs": [
+      "CUR__COGS"
+    ],
+    "EXT__Tax_Model_xlsx__Rates": [
+      "CUR__Tax"
     ]
   },
   "parents": {
-    "Guides": [
-      "Root"
+    "CUR__COGS": [
+      "CUR__Assumptions",
+      "CUR__RawData",
+      "CUR__Revenue",
+      "EXT__Suppliers_xlsx__Costs"
     ],
-    "API": [
-      "Root"
+    "CUR__CashFlow": [
+      "CUR__Assumptions",
+      "CUR__COGS",
+      "CUR__EBITDA",
+      "CUR__NetIncome",
+      "CUR__OpEx",
+      "CUR__Revenue",
+      "EXT__Capex_Schedule_xlsx__Plan"
     ],
-    "Examples": [
-      "Root"
+    "CUR__EBITDA": [
+      "CUR__Assumptions",
+      "CUR__COGS",
+      "CUR__OpEx",
+      "CUR__Revenue",
+      "EXT__Industry_Benchmarks_xlsx__EBITDA"
     ],
-    "Editor": [
-      "Guides"
+    "CUR__NetIncome": [
+      "CUR__Assumptions",
+      "CUR__EBITDA",
+      "CUR__Revenue",
+      "CUR__Tax"
     ],
-    "Keyboard": [
-      "Editor"
+    "CUR__OpEx": [
+      "CUR__Assumptions",
+      "CUR__Revenue",
+      "EXT__HR_Model_xlsx__Headcount"
     ],
-    "NavKeys": [
-      "Keyboard"
+    "CUR__Revenue": [
+      "CUR__Assumptions",
+      "CUR__RawData",
+      "EXT__Budget_2026_xlsx__Forecast"
     ],
-    "EditKeys": [
-      "Keyboard"
+    "CUR__Summary": [
+      "CUR__Assumptions",
+      "CUR__COGS",
+      "CUR__CashFlow",
+      "CUR__EBITDA",
+      "CUR__NetIncome",
+      "CUR__OpEx",
+      "CUR__Revenue",
+      "CUR__Tax",
+      "EXT__Prior_Year_xlsx__Summary"
     ],
-    "Slash": [
-      "Guides"
-    ],
-    "SlashDiagram": [
-      "Slash"
-    ],
-    "SlashTable": [
-      "Slash"
-    ],
-    "SlashCode": [
-      "Slash"
-    ],
-    "SlashOther": [
-      "Slash"
-    ],
-    "OpenAPI": [
-      "API"
-    ],
-    "OpenSchemas": [
-      "OpenAPI"
-    ],
-    "OpenModels": [
-      "OpenAPI"
-    ],
-    "REST": [
-      "API"
-    ],
-    "Auth": [
-      "REST"
-    ],
-    "Methods": [
-      "REST"
-    ],
-    "Manual": [
-      "API"
-    ],
-    "Types": [
-      "Manual"
-    ],
-    "Errors": [
-      "Manual"
-    ],
-    "Diagrams": [
-      "Examples"
-    ],
-    "Flowcharts": [
-      "Diagrams"
-    ],
-    "Graphs": [
-      "Diagrams"
-    ],
-    "States": [
-      "Diagrams"
-    ],
-    "Patterns": [
-      "Examples"
-    ],
-    "Architecture": [
-      "Patterns"
-    ],
-    "UML": [
-      "Patterns"
-    ],
-    "Advanced": [
-      "Examples"
-    ],
-    "Performance": [
-      "Advanced"
-    ],
-    "Security": [
-      "Advanced"
+    "CUR__Tax": [
+      "CUR__Assumptions",
+      "CUR__EBITDA",
+      "EXT__Tax_Model_xlsx__Rates"
     ]
   }
 };

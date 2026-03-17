@@ -370,24 +370,52 @@ _HTML_TEMPLATE = """\
       justify-content: flex-end;
       align-items: center;
       gap: .5rem;
-      padding: .75rem 1.25rem;
+      padding: .55rem 1.25rem;
       background: #fff;
-      border-bottom: 1px solid #e0e0e0;
+      border-bottom: 1px solid #e8e8e8;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
     }
 
     .tb-btn {
-      padding: .35rem .9rem;
-      font-size: .8rem;
-      font-weight: 500;
-      border: 1px solid #c8c8c8;
-      border-radius: 5px;
-      background: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      padding: .42rem 1rem;
+      font-size: .78rem;
+      font-weight: 600;
+      border: 1.5px solid transparent;
+      border-radius: 6px;
       cursor: pointer;
-      color: #333;
-      letter-spacing: .02em;
-      transition: background .15s, border-color .15s;
+      letter-spacing: .03em;
+      line-height: 1;
+      white-space: nowrap;
+      transition: background .14s, border-color .14s, box-shadow .14s,
+                  color .14s, transform .08s;
     }
-    .tb-btn:hover { background: #f0f4f8; border-color: steelblue; }
+    .tb-btn:active { transform: scale(.95); }
+
+    #download-btn {
+      background: steelblue;
+      color: #fff;
+      border-color: steelblue;
+      box-shadow: 0 1px 3px rgba(70,130,180,.4);
+    }
+    #download-btn:hover {
+      background: #3a72a0;
+      border-color: #3a72a0;
+      box-shadow: 0 2px 7px rgba(70,130,180,.45);
+    }
+
+    #reset-btn {
+      background: #fff;
+      color: #555;
+      border-color: #d4d4d4;
+    }
+    #reset-btn:hover {
+      background: #f0f5fb;
+      border-color: steelblue;
+      color: steelblue;
+    }
 
     /* ── diagram area ─────────────────────────────────────────────────── */
     #diagram-container {
@@ -439,8 +467,8 @@ _HTML_TEMPLATE = """\
 </head>
 <body>
   <div id="toolbar">
-    <button id="download-btn" class="tb-btn" onclick="downloadPNG()">&#x2193;&nbsp;Download PNG</button>
-    <button id="reset-btn" class="tb-btn" onclick="resetView()">&#x21BA;&nbsp;Reset view</button>
+    <button id="download-btn" class="tb-btn" onclick="downloadPNG()"><span>&#x2B07;</span>Download PNG</button>
+    <button id="reset-btn" class="tb-btn" onclick="resetView()"><span>&#x21BA;</span>Reset view</button>
   </div>
   <div id="diagram-container">
     <pre class="mermaid">
