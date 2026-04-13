@@ -1,0 +1,2095 @@
+{
+  "pipeline_name": "E-Commerce Analytics ETL Pipeline",
+  "pipeline_type": "pandas_etl",
+  "source_file": "DataPipelineToMermaid/test_fixtures/pandas_etl.py",
+  "description": "Comprehensive e-commerce analytics pipeline that reads order, customer, product, and web session data from CSV/Parquet files, performs complex transformations including currency normalization, customer segmentation, RFM analysis, and product performance calculations, then outputs customer 360-degree profiles, product performance metrics, and daily KPIs to multiple formats including Parquet files, CSV, and PostgreSQL database for business intelligence and reporting.",
+  "sources": [
+    {
+      "schema_name": "",
+      "table_name": "data/orders.csv",
+      "columns": [
+        {
+          "name": "order_id",
+          "data_type": "int64",
+          "description": "Unique identifier for each order"
+        },
+        {
+          "name": "customer_id",
+          "data_type": "int64",
+          "description": "Customer who placed the order"
+        },
+        {
+          "name": "store_id",
+          "data_type": "Int64",
+          "description": "Store location identifier (nullable)"
+        },
+        {
+          "name": "order_date",
+          "data_type": "datetime",
+          "description": "Date when order was placed"
+        },
+        {
+          "name": "ship_date",
+          "data_type": "datetime",
+          "description": "Date when order was shipped"
+        },
+        {
+          "name": "total_amount",
+          "data_type": "float64",
+          "description": "Total order amount in original currency"
+        },
+        {
+          "name": "discount_amount",
+          "data_type": "float64",
+          "description": "Discount applied to order"
+        },
+        {
+          "name": "tax_amount",
+          "data_type": "float64",
+          "description": "Tax amount charged"
+        },
+        {
+          "name": "shipping_cost",
+          "data_type": "float64",
+          "description": "Shipping cost charged"
+        },
+        {
+          "name": "payment_method",
+          "data_type": "string",
+          "description": "Payment method used"
+        },
+        {
+          "name": "channel",
+          "data_type": "string",
+          "description": "Sales channel (web, mobile, store, etc.)"
+        },
+        {
+          "name": "currency",
+          "data_type": "string",
+          "description": "Currency code for monetary amounts"
+        },
+        {
+          "name": "status",
+          "data_type": "string",
+          "description": "Order status (confirmed, shipped, cancelled, etc.)"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "",
+      "table_name": "data/order_items.csv",
+      "columns": [
+        {
+          "name": "item_id",
+          "data_type": "int64",
+          "description": "Unique identifier for order line item"
+        },
+        {
+          "name": "order_id",
+          "data_type": "int64",
+          "description": "Order this item belongs to"
+        },
+        {
+          "name": "product_id",
+          "data_type": "int64",
+          "description": "Product purchased"
+        },
+        {
+          "name": "quantity",
+          "data_type": "int64",
+          "description": "Quantity of product ordered"
+        },
+        {
+          "name": "unit_price",
+          "data_type": "float64",
+          "description": "Price per unit"
+        },
+        {
+          "name": "line_total",
+          "data_type": "float64",
+          "description": "Total amount for this line item"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "",
+      "table_name": "data/customers.parquet",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "int64",
+          "description": "Unique customer identifier"
+        },
+        {
+          "name": "first_name",
+          "data_type": "string",
+          "description": "Customer first name"
+        },
+        {
+          "name": "last_name",
+          "data_type": "string",
+          "description": "Customer last name"
+        },
+        {
+          "name": "email",
+          "data_type": "string",
+          "description": "Customer email address"
+        },
+        {
+          "name": "signup_date",
+          "data_type": "datetime",
+          "description": "Date customer signed up"
+        },
+        {
+          "name": "country",
+          "data_type": "string",
+          "description": "Customer country"
+        },
+        {
+          "name": "region",
+          "data_type": "string",
+          "description": "Customer region"
+        },
+        {
+          "name": "segment",
+          "data_type": "string",
+          "description": "Customer segment classification"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "",
+      "table_name": "data/products.parquet",
+      "columns": [
+        {
+          "name": "product_id",
+          "data_type": "int64",
+          "description": "Unique product identifier"
+        },
+        {
+          "name": "product_name",
+          "data_type": "string",
+          "description": "Product name"
+        },
+        {
+          "name": "category",
+          "data_type": "string",
+          "description": "Product category"
+        },
+        {
+          "name": "sub_category",
+          "data_type": "string",
+          "description": "Product sub-category"
+        },
+        {
+          "name": "brand",
+          "data_type": "string",
+          "description": "Product brand"
+        },
+        {
+          "name": "cost_price",
+          "data_type": "float64",
+          "description": "Cost price for margin calculation"
+        },
+        {
+          "name": "is_digital",
+          "data_type": "boolean",
+          "description": "Whether product is digital"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "",
+      "table_name": "data/exchange_rates.csv",
+      "columns": [
+        {
+          "name": "rate_date",
+          "data_type": "datetime",
+          "description": "Date of exchange rate"
+        },
+        {
+          "name": "from_currency",
+          "data_type": "string",
+          "description": "Source currency code"
+        },
+        {
+          "name": "to_currency",
+          "data_type": "string",
+          "description": "Target currency code"
+        },
+        {
+          "name": "rate",
+          "data_type": "float64",
+          "description": "Exchange rate from source to target currency"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "",
+      "table_name": "data/web_sessions.csv",
+      "columns": [
+        {
+          "name": "session_id",
+          "data_type": "string",
+          "description": "Unique web session identifier"
+        },
+        {
+          "name": "customer_id",
+          "data_type": "Int64",
+          "description": "Customer associated with session (nullable)"
+        },
+        {
+          "name": "session_start",
+          "data_type": "datetime",
+          "description": "Session start timestamp"
+        },
+        {
+          "name": "session_end",
+          "data_type": "datetime",
+          "description": "Session end timestamp"
+        },
+        {
+          "name": "page_views",
+          "data_type": "int64",
+          "description": "Number of pages viewed in session"
+        },
+        {
+          "name": "events",
+          "data_type": "int64",
+          "description": "Number of events triggered in session"
+        },
+        {
+          "name": "device_type",
+          "data_type": "string",
+          "description": "Device type used (mobile, desktop, etc.)"
+        },
+        {
+          "name": "referrer",
+          "data_type": "string",
+          "description": "Traffic source/referrer"
+        },
+        {
+          "name": "converted",
+          "data_type": "boolean",
+          "description": "Whether session resulted in conversion"
+        }
+      ],
+      "table_type": "source"
+    }
+  ],
+  "targets": [
+    {
+      "schema_name": "",
+      "table_name": "output/customer_360.parquet",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "int64",
+          "description": "Unique customer identifier"
+        },
+        {
+          "name": "first_name",
+          "data_type": "string",
+          "description": "Customer first name"
+        },
+        {
+          "name": "last_name",
+          "data_type": "string",
+          "description": "Customer last name"
+        },
+        {
+          "name": "email",
+          "data_type": "string",
+          "description": "Customer email address"
+        },
+        {
+          "name": "signup_date",
+          "data_type": "datetime",
+          "description": "Date customer signed up"
+        },
+        {
+          "name": "country",
+          "data_type": "string",
+          "description": "Customer country"
+        },
+        {
+          "name": "region",
+          "data_type": "string",
+          "description": "Customer region"
+        },
+        {
+          "name": "segment",
+          "data_type": "string",
+          "description": "Customer segment classification"
+        },
+        {
+          "name": "total_orders",
+          "data_type": "int64",
+          "description": "Total number of orders placed by customer"
+        },
+        {
+          "name": "first_order_date",
+          "data_type": "datetime",
+          "description": "Date of customer's first order"
+        },
+        {
+          "name": "last_order_date",
+          "data_type": "datetime",
+          "description": "Date of customer's most recent order"
+        },
+        {
+          "name": "lifetime_revenue",
+          "data_type": "float64",
+          "description": "Total revenue generated by customer in USD"
+        },
+        {
+          "name": "avg_order_value",
+          "data_type": "float64",
+          "description": "Average order value in USD"
+        },
+        {
+          "name": "total_discount_usd",
+          "data_type": "float64",
+          "description": "Total discounts received in USD"
+        },
+        {
+          "name": "total_tax_usd",
+          "data_type": "float64",
+          "description": "Total tax paid in USD"
+        },
+        {
+          "name": "online_orders",
+          "data_type": "int64",
+          "description": "Number of online orders"
+        },
+        {
+          "name": "offline_orders",
+          "data_type": "int64",
+          "description": "Number of offline orders"
+        },
+        {
+          "name": "payment_methods",
+          "data_type": "int64",
+          "description": "Number of unique payment methods used"
+        },
+        {
+          "name": "high_value_orders",
+          "data_type": "int64",
+          "description": "Number of high-value orders (top 10% by amount)"
+        },
+        {
+          "name": "days_since_last_order",
+          "data_type": "int64",
+          "description": "Days since customer's last order"
+        },
+        {
+          "name": "online_pct",
+          "data_type": "float64",
+          "description": "Percentage of orders placed online"
+        },
+        {
+          "name": "top_category",
+          "data_type": "string",
+          "description": "Product category with highest spend"
+        },
+        {
+          "name": "top_category_spend",
+          "data_type": "float64",
+          "description": "Amount spent in top category"
+        },
+        {
+          "name": "top_brand",
+          "data_type": "string",
+          "description": "Brand with highest spend"
+        },
+        {
+          "name": "top_brand_spend",
+          "data_type": "float64",
+          "description": "Amount spent on top brand"
+        },
+        {
+          "name": "distinct_products",
+          "data_type": "int64",
+          "description": "Number of unique products purchased"
+        },
+        {
+          "name": "total_sessions",
+          "data_type": "int64",
+          "description": "Total web sessions"
+        },
+        {
+          "name": "total_page_views",
+          "data_type": "int64",
+          "description": "Total page views across all sessions"
+        },
+        {
+          "name": "avg_page_views",
+          "data_type": "float64",
+          "description": "Average page views per session"
+        },
+        {
+          "name": "total_events",
+          "data_type": "int64",
+          "description": "Total events triggered across sessions"
+        },
+        {
+          "name": "conversion_count",
+          "data_type": "int64",
+          "description": "Number of sessions that converted"
+        },
+        {
+          "name": "last_session",
+          "data_type": "datetime",
+          "description": "Date of last web session"
+        },
+        {
+          "name": "mobile_sessions",
+          "data_type": "int64",
+          "description": "Number of mobile sessions"
+        },
+        {
+          "name": "conversion_rate",
+          "data_type": "float64",
+          "description": "Session conversion rate percentage"
+        },
+        {
+          "name": "days_since_last_session",
+          "data_type": "int64",
+          "description": "Days since last web session"
+        },
+        {
+          "name": "recency_score",
+          "data_type": "int64",
+          "description": "RFM recency score (1-5, 5=most recent)"
+        },
+        {
+          "name": "frequency_score",
+          "data_type": "int64",
+          "description": "RFM frequency score (1-5, 5=most frequent)"
+        },
+        {
+          "name": "monetary_score",
+          "data_type": "int64",
+          "description": "RFM monetary score (1-5, 5=highest value)"
+        },
+        {
+          "name": "rfm_total",
+          "data_type": "int64",
+          "description": "Sum of RFM scores"
+        },
+        {
+          "name": "rfm_segment",
+          "data_type": "string",
+          "description": "RFM-based customer segment (Champion, Loyal, At Risk, etc.)"
+        },
+        {
+          "name": "customer_tier",
+          "data_type": "string",
+          "description": "Customer tier based on revenue and order count (Platinum, Gold, Silver, Bronze)"
+        },
+        {
+          "name": "months_active",
+          "data_type": "float64",
+          "description": "Number of months between first and last order"
+        },
+        {
+          "name": "monthly_spend_rate",
+          "data_type": "float64",
+          "description": "Average monthly spend rate"
+        },
+        {
+          "name": "predicted_3yr_ltv",
+          "data_type": "float64",
+          "description": "Predicted 3-year lifetime value"
+        },
+        {
+          "name": "full_name",
+          "data_type": "string",
+          "description": "Customer full name (first + last)"
+        },
+        {
+          "name": "nps_proxy",
+          "data_type": "string",
+          "description": "NPS proxy based on RFM segment (Promoter, Passive, Detractor)"
+        },
+        {
+          "name": "etl_timestamp",
+          "data_type": "datetime",
+          "description": "ETL processing timestamp"
+        },
+        {
+          "name": "model_version",
+          "data_type": "string",
+          "description": "Model version used for calculations"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "",
+      "table_name": "output/product_performance.parquet",
+      "columns": [
+        {
+          "name": "product_id",
+          "data_type": "int64",
+          "description": "Unique product identifier"
+        },
+        {
+          "name": "product_name",
+          "data_type": "string",
+          "description": "Product name"
+        },
+        {
+          "name": "category",
+          "data_type": "string",
+          "description": "Product category"
+        },
+        {
+          "name": "sub_category",
+          "data_type": "string",
+          "description": "Product sub-category"
+        },
+        {
+          "name": "brand",
+          "data_type": "string",
+          "description": "Product brand"
+        },
+        {
+          "name": "total_quantity",
+          "data_type": "int64",
+          "description": "Total quantity sold"
+        },
+        {
+          "name": "total_revenue",
+          "data_type": "float64",
+          "description": "Total revenue generated"
+        },
+        {
+          "name": "total_margin",
+          "data_type": "float64",
+          "description": "Total margin earned"
+        },
+        {
+          "name": "avg_unit_price",
+          "data_type": "float64",
+          "description": "Average unit price"
+        },
+        {
+          "name": "unique_customers",
+          "data_type": "int64",
+          "description": "Number of unique customers who bought this product"
+        },
+        {
+          "name": "order_count",
+          "data_type": "int64",
+          "description": "Number of orders containing this product"
+        },
+        {
+          "name": "first_sale",
+          "data_type": "datetime",
+          "description": "Date of first sale"
+        },
+        {
+          "name": "last_sale",
+          "data_type": "datetime",
+          "description": "Date of last sale"
+        },
+        {
+          "name": "online_sales",
+          "data_type": "int64",
+          "description": "Number of online sales"
+        },
+        {
+          "name": "avg_margin_pct",
+          "data_type": "float64",
+          "description": "Average margin percentage"
+        },
+        {
+          "name": "revenue_rank",
+          "data_type": "int64",
+          "description": "Revenue rank among all products"
+        },
+        {
+          "name": "abc_class",
+          "data_type": "string",
+          "description": "ABC classification based on cumulative revenue (A=top 80%, B=80-95%, C=95-100%)"
+        },
+        {
+          "name": "etl_timestamp",
+          "data_type": "datetime",
+          "description": "ETL processing timestamp"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "",
+      "table_name": "output/daily_kpi.csv",
+      "columns": [
+        {
+          "name": "report_date",
+          "data_type": "date",
+          "description": "Date for KPI metrics"
+        },
+        {
+          "name": "order_count",
+          "data_type": "int64",
+          "description": "Number of orders placed on this date"
+        },
+        {
+          "name": "unique_customers",
+          "data_type": "int64",
+          "description": "Number of unique customers who placed orders"
+        },
+        {
+          "name": "total_revenue",
+          "data_type": "float64",
+          "description": "Total revenue in USD for the date"
+        },
+        {
+          "name": "avg_order_value",
+          "data_type": "float64",
+          "description": "Average order value for the date"
+        },
+        {
+          "name": "total_discount",
+          "data_type": "float64",
+          "description": "Total discounts given on the date"
+        },
+        {
+          "name": "online_orders",
+          "data_type": "int64",
+          "description": "Number of online orders"
+        },
+        {
+          "name": "rolling_7d_revenue",
+          "data_type": "float64",
+          "description": "7-day rolling sum of revenue"
+        },
+        {
+          "name": "rolling_7d_orders",
+          "data_type": "int64",
+          "description": "7-day rolling sum of orders"
+        },
+        {
+          "name": "rolling_30d_revenue",
+          "data_type": "float64",
+          "description": "30-day rolling sum of revenue"
+        },
+        {
+          "name": "dod_revenue_change",
+          "data_type": "float64",
+          "description": "Day-over-day revenue change percentage"
+        },
+        {
+          "name": "etl_timestamp",
+          "data_type": "datetime",
+          "description": "ETL processing timestamp"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "public",
+      "table_name": "customer_summary",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "int64",
+          "description": "Unique customer identifier"
+        },
+        {
+          "name": "first_name",
+          "data_type": "string",
+          "description": "Customer first name"
+        },
+        {
+          "name": "last_name",
+          "data_type": "string",
+          "description": "Customer last name"
+        },
+        {
+          "name": "email",
+          "data_type": "string",
+          "description": "Customer email address"
+        },
+        {
+          "name": "signup_date",
+          "data_type": "datetime",
+          "description": "Date customer signed up"
+        },
+        {
+          "name": "country",
+          "data_type": "string",
+          "description": "Customer country"
+        },
+        {
+          "name": "region",
+          "data_type": "string",
+          "description": "Customer region"
+        },
+        {
+          "name": "segment",
+          "data_type": "string",
+          "description": "Customer segment classification"
+        },
+        {
+          "name": "total_orders",
+          "data_type": "int64",
+          "description": "Total number of orders placed by customer"
+        },
+        {
+          "name": "first_order_date",
+          "data_type": "datetime",
+          "description": "Date of customer's first order"
+        },
+        {
+          "name": "last_order_date",
+          "data_type": "datetime",
+          "description": "Date of customer's most recent order"
+        },
+        {
+          "name": "lifetime_revenue",
+          "data_type": "float64",
+          "description": "Total revenue generated by customer in USD"
+        },
+        {
+          "name": "avg_order_value",
+          "data_type": "float64",
+          "description": "Average order value in USD"
+        },
+        {
+          "name": "total_discount_usd",
+          "data_type": "float64",
+          "description": "Total discounts received in USD"
+        },
+        {
+          "name": "total_tax_usd",
+          "data_type": "float64",
+          "description": "Total tax paid in USD"
+        },
+        {
+          "name": "online_orders",
+          "data_type": "int64",
+          "description": "Number of online orders"
+        },
+        {
+          "name": "offline_orders",
+          "data_type": "int64",
+          "description": "Number of offline orders"
+        },
+        {
+          "name": "payment_methods",
+          "data_type": "int64",
+          "description": "Number of unique payment methods used"
+        },
+        {
+          "name": "high_value_orders",
+          "data_type": "int64",
+          "description": "Number of high-value orders (top 10% by amount)"
+        },
+        {
+          "name": "days_since_last_order",
+          "data_type": "int64",
+          "description": "Days since customer's last order"
+        },
+        {
+          "name": "online_pct",
+          "data_type": "float64",
+          "description": "Percentage of orders placed online"
+        },
+        {
+          "name": "top_category",
+          "data_type": "string",
+          "description": "Product category with highest spend"
+        },
+        {
+          "name": "top_category_spend",
+          "data_type": "float64",
+          "description": "Amount spent in top category"
+        },
+        {
+          "name": "top_brand",
+          "data_type": "string",
+          "description": "Brand with highest spend"
+        },
+        {
+          "name": "top_brand_spend",
+          "data_type": "float64",
+          "description": "Amount spent on top brand"
+        },
+        {
+          "name": "distinct_products",
+          "data_type": "int64",
+          "description": "Number of unique products purchased"
+        },
+        {
+          "name": "total_sessions",
+          "data_type": "int64",
+          "description": "Total web sessions"
+        },
+        {
+          "name": "total_page_views",
+          "data_type": "int64",
+          "description": "Total page views across all sessions"
+        },
+        {
+          "name": "avg_page_views",
+          "data_type": "float64",
+          "description": "Average page views per session"
+        },
+        {
+          "name": "total_events",
+          "data_type": "int64",
+          "description": "Total events triggered across sessions"
+        },
+        {
+          "name": "conversion_count",
+          "data_type": "int64",
+          "description": "Number of sessions that converted"
+        },
+        {
+          "name": "last_session",
+          "data_type": "datetime",
+          "description": "Date of last web session"
+        },
+        {
+          "name": "mobile_sessions",
+          "data_type": "int64",
+          "description": "Number of mobile sessions"
+        },
+        {
+          "name": "conversion_rate",
+          "data_type": "float64",
+          "description": "Session conversion rate percentage"
+        },
+        {
+          "name": "days_since_last_session",
+          "data_type": "int64",
+          "description": "Days since last web session"
+        },
+        {
+          "name": "recency_score",
+          "data_type": "int64",
+          "description": "RFM recency score (1-5, 5=most recent)"
+        },
+        {
+          "name": "frequency_score",
+          "data_type": "int64",
+          "description": "RFM frequency score (1-5, 5=most frequent)"
+        },
+        {
+          "name": "monetary_score",
+          "data_type": "int64",
+          "description": "RFM monetary score (1-5, 5=highest value)"
+        },
+        {
+          "name": "rfm_total",
+          "data_type": "int64",
+          "description": "Sum of RFM scores"
+        },
+        {
+          "name": "rfm_segment",
+          "data_type": "string",
+          "description": "RFM-based customer segment (Champion, Loyal, At Risk, etc.)"
+        },
+        {
+          "name": "customer_tier",
+          "data_type": "string",
+          "description": "Customer tier based on revenue and order count (Platinum, Gold, Silver, Bronze)"
+        },
+        {
+          "name": "months_active",
+          "data_type": "float64",
+          "description": "Number of months between first and last order"
+        },
+        {
+          "name": "monthly_spend_rate",
+          "data_type": "float64",
+          "description": "Average monthly spend rate"
+        },
+        {
+          "name": "predicted_3yr_ltv",
+          "data_type": "float64",
+          "description": "Predicted 3-year lifetime value"
+        },
+        {
+          "name": "full_name",
+          "data_type": "string",
+          "description": "Customer full name (first + last)"
+        },
+        {
+          "name": "nps_proxy",
+          "data_type": "string",
+          "description": "NPS proxy based on RFM segment (Promoter, Passive, Detractor)"
+        },
+        {
+          "name": "etl_timestamp",
+          "data_type": "datetime",
+          "description": "ETL processing timestamp"
+        },
+        {
+          "name": "model_version",
+          "data_type": "string",
+          "description": "Model version used for calculations"
+        }
+      ],
+      "table_type": "target"
+    }
+  ],
+  "components": [
+    {
+      "name": "extract_orders",
+      "component_type": "pandas_step",
+      "description": "Reads orders CSV file with data type coercion and date parsing for order_date and ship_date columns, ensuring proper data types for downstream processing",
+      "input_tables": [
+        "data/orders.csv"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "store_id",
+        "order_date",
+        "ship_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "channel",
+        "currency",
+        "status"
+      ],
+      "sql_text": "pd.read_csv with parse_dates=['order_date', 'ship_date'] and dtype specifications"
+    },
+    {
+      "name": "extract_order_items",
+      "component_type": "pandas_step",
+      "description": "Reads order items CSV file containing line-level order details with proper data type casting",
+      "input_tables": [
+        "data/order_items.csv"
+      ],
+      "output_columns": [
+        "item_id",
+        "order_id",
+        "product_id",
+        "quantity",
+        "unit_price",
+        "line_total"
+      ],
+      "sql_text": "pd.read_csv with dtype specifications for numeric columns"
+    },
+    {
+      "name": "extract_customers",
+      "component_type": "pandas_step",
+      "description": "Reads customer master data from Parquet file containing customer demographics and signup information",
+      "input_tables": [
+        "data/customers.parquet"
+      ],
+      "output_columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "signup_date",
+        "country",
+        "region",
+        "segment"
+      ],
+      "sql_text": "pd.read_parquet(DATA_DIR / 'customers.parquet')"
+    },
+    {
+      "name": "extract_products",
+      "component_type": "pandas_step",
+      "description": "Reads product master data from Parquet file containing product details, categories, and cost information",
+      "input_tables": [
+        "data/products.parquet"
+      ],
+      "output_columns": [
+        "product_id",
+        "product_name",
+        "category",
+        "sub_category",
+        "brand",
+        "cost_price",
+        "is_digital"
+      ],
+      "sql_text": "pd.read_parquet(DATA_DIR / 'products.parquet')"
+    },
+    {
+      "name": "extract_exchange_rates",
+      "component_type": "pandas_step",
+      "description": "Reads daily exchange rates for currency conversion with date parsing",
+      "input_tables": [
+        "data/exchange_rates.csv"
+      ],
+      "output_columns": [
+        "rate_date",
+        "from_currency",
+        "to_currency",
+        "rate"
+      ],
+      "sql_text": "pd.read_csv with parse_dates=['rate_date']"
+    },
+    {
+      "name": "extract_web_sessions",
+      "component_type": "pandas_step",
+      "description": "Reads web session clickstream data with session timestamps and engagement metrics",
+      "input_tables": [
+        "data/web_sessions.csv"
+      ],
+      "output_columns": [
+        "session_id",
+        "customer_id",
+        "session_start",
+        "session_end",
+        "page_views",
+        "events",
+        "device_type",
+        "referrer",
+        "converted"
+      ],
+      "sql_text": "pd.read_csv with parse_dates=['session_start', 'session_end']"
+    },
+    {
+      "name": "clean_orders",
+      "component_type": "pandas_step",
+      "description": "Filters out cancelled and fraudulent orders, normalizes channel names into Online/Offline groups, and flags high-value orders (top 10% by amount)",
+      "input_tables": [
+        "orders_raw"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "store_id",
+        "order_date",
+        "ship_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "channel",
+        "currency",
+        "status",
+        "channel_group",
+        "is_high_value"
+      ],
+      "sql_text": "df[~df['status'].isin(['cancelled', 'fraudulent'])]; channel_map = {'web': 'Online', 'mobile': 'Online', 'app': 'Online', 'store': 'Offline', 'phone': 'Offline', 'catalog': 'Offline'}; df['is_high_value'] = df['total_amount'] > df['total_amount'].quantile(0.9)"
+    },
+    {
+      "name": "normalize_currency",
+      "component_type": "pandas_step",
+      "description": "Converts all monetary amounts to USD using latest exchange rates, calculates USD equivalents for total_amount, discount_amount, tax_amount, shipping_cost, and computes net_amount_usd",
+      "input_tables": [
+        "orders_clean",
+        "fx_rates"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "store_id",
+        "order_date",
+        "ship_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "channel",
+        "currency",
+        "status",
+        "channel_group",
+        "is_high_value",
+        "fx_rate",
+        "total_amount_usd",
+        "discount_amount_usd",
+        "tax_amount_usd",
+        "shipping_cost_usd",
+        "net_amount_usd"
+      ],
+      "sql_text": "latest_fx = fx_rates[fx_rates['to_currency'] == 'USD'].sort_values('rate_date').drop_duplicates(subset=['from_currency'], keep='last'); df['fx_rate'] = df['currency'].map(latest_fx); df[f'{col}_usd'] = df[col] * df['fx_rate']; df['net_amount_usd'] = df['total_amount_usd'] - df['discount_amount_usd'] + df['tax_amount_usd']"
+    },
+    {
+      "name": "enrich_order_items",
+      "component_type": "pandas_step",
+      "description": "Joins order items with product details to add category, brand, and cost information, calculates margin (line_total - cost_price * quantity), margin percentage, and assigns margin bands (Negative, Low, Medium, High, Premium)",
+      "input_tables": [
+        "items_raw",
+        "products"
+      ],
+      "output_columns": [
+        "item_id",
+        "order_id",
+        "product_id",
+        "quantity",
+        "unit_price",
+        "line_total",
+        "product_name",
+        "category",
+        "sub_category",
+        "brand",
+        "cost_price",
+        "is_digital",
+        "margin",
+        "margin_pct",
+        "margin_band"
+      ],
+      "sql_text": "items.merge(products[['product_id', 'product_name', 'category', 'sub_category', 'brand', 'cost_price', 'is_digital']], on='product_id', how='left'); df['margin'] = df['line_total'] - (df['cost_price'] * df['quantity']); df['margin_pct'] = (df['margin'] / df['line_total'].replace(0, np.nan) * 100).fillna(0); pd.cut(df['margin_pct'], bins=[-np.inf, 0, 15, 30, 50, np.inf], labels=['Negative', 'Low', 'Medium', 'High', 'Premium'])"
+    },
+    {
+      "name": "build_customer_360_order_agg",
+      "component_type": "pandas_step",
+      "description": "Aggregates order data by customer to calculate transaction metrics: total orders, first/last order dates, lifetime revenue, average order value, discount/tax totals, online/offline order counts, payment method diversity, and high-value order count",
+      "input_tables": [
+        "orders_usd"
+      ],
+      "output_columns": [
+        "customer_id",
+        "total_orders",
+        "first_order_date",
+        "last_order_date",
+        "lifetime_revenue",
+        "avg_order_value",
+        "total_discount_usd",
+        "total_tax_usd",
+        "online_orders",
+        "offline_orders",
+        "payment_methods",
+        "high_value_orders",
+        "days_since_last_order",
+        "online_pct"
+      ],
+      "sql_text": "orders.groupby('customer_id').agg(total_orders=('order_id', 'nunique'), first_order_date=('order_date', 'min'), last_order_date=('order_date', 'max'), lifetime_revenue=('net_amount_usd', 'sum'), avg_order_value=('net_amount_usd', 'mean'), total_discount_usd=('discount_amount_usd', 'sum'), total_tax_usd=('tax_amount_usd', 'sum'), online_orders=('channel_group', lambda x: (x == 'Online').sum()), offline_orders=('channel_group', lambda x: (x == 'Offline').sum()), payment_methods=('payment_method', 'nunique'), high_value_orders=('is_high_value', 'sum'))"
+    },
+    {
+      "name": "build_customer_360_top_category",
+      "component_type": "pandas_step",
+      "description": "Identifies each customer's top spending category by joining order items with orders, grouping by customer and category, summing spend, and keeping the highest spend category per customer",
+      "input_tables": [
+        "items_enriched",
+        "orders_usd"
+      ],
+      "output_columns": [
+        "customer_id",
+        "top_category",
+        "top_category_spend"
+      ],
+      "sql_text": "cust_items = items_enriched.merge(orders[['order_id', 'customer_id']], on='order_id'); cust_items.groupby(['customer_id', 'category']).agg(cat_spend=('line_total', 'sum')).reset_index().sort_values(['customer_id', 'cat_spend'], ascending=[True, False]).drop_duplicates(subset=['customer_id'], keep='first')"
+    },
+    {
+      "name": "build_customer_360_top_brand",
+      "component_type": "pandas_step",
+      "description": "Identifies each customer's top spending brand by grouping customer items by brand, summing spend, and keeping the highest spend brand per customer",
+      "input_tables": [
+        "cust_items"
+      ],
+      "output_columns": [
+        "customer_id",
+        "top_brand",
+        "top_brand_spend"
+      ],
+      "sql_text": "cust_items.groupby(['customer_id', 'brand']).agg(brand_spend=('line_total', 'sum')).reset_index().sort_values(['customer_id', 'brand_spend'], ascending=[True, False]).drop_duplicates(subset=['customer_id'], keep='first')"
+    },
+    {
+      "name": "build_customer_360_distinct_products",
+      "component_type": "pandas_step",
+      "description": "Counts the number of distinct products purchased by each customer",
+      "input_tables": [
+        "cust_items"
+      ],
+      "output_columns": [
+        "customer_id",
+        "distinct_products"
+      ],
+      "sql_text": "cust_items.groupby('customer_id')['product_id'].nunique().reset_index().rename(columns={'product_id': 'distinct_products'})"
+    },
+    {
+      "name": "build_customer_360_web_agg",
+      "component_type": "pandas_step",
+      "description": "Aggregates web session data by customer to calculate engagement metrics: total sessions, page views, events, conversion count/rate, last session date, mobile session count, and days since last session",
+      "input_tables": [
+        "web_sessions"
+      ],
+      "output_columns": [
+        "customer_id",
+        "total_sessions",
+        "total_page_views",
+        "avg_page_views",
+        "total_events",
+        "conversion_count",
+        "last_session",
+        "mobile_sessions",
+        "conversion_rate",
+        "days_since_last_session"
+      ],
+      "sql_text": "web_sessions[web_sessions['customer_id'].notna()].groupby('customer_id').agg(total_sessions=('session_id', 'nunique'), total_page_views=('page_views', 'sum'), avg_page_views=('page_views', 'mean'), total_events=('events', 'sum'), conversion_count=('converted', 'sum'), last_session=('session_start', 'max'), mobile_sessions=('device_type', lambda x: (x == 'mobile').sum())); conversion_rate = conversion_count / total_sessions * 100"
+    },
+    {
+      "name": "build_customer_360_rfm",
+      "component_type": "pandas_step",
+      "description": "Calculates RFM (Recency, Frequency, Monetary) scores using quintile ranking: recency based on days since last order (5=most recent), frequency on total orders (5=most frequent), monetary on lifetime revenue (5=highest), and assigns RFM segments (Champion, Loyal, At Risk, Lost, etc.)",
+      "input_tables": [
+        "order_agg"
+      ],
+      "output_columns": [
+        "customer_id",
+        "recency_score",
+        "frequency_score",
+        "monetary_score",
+        "rfm_total",
+        "rfm_segment"
+      ],
+      "sql_text": "rfm['recency_score'] = pd.qcut(rfm['days_since_last_order'], 5, labels=[5, 4, 3, 2, 1]).astype(int); rfm['frequency_score'] = pd.qcut(rfm['total_orders'].rank(method='first'), 5, labels=[1, 2, 3, 4, 5]).astype(int); rfm['monetary_score'] = pd.qcut(rfm['lifetime_revenue'].rank(method='first'), 5, labels=[1, 2, 3, 4, 5]).astype(int); rfm['rfm_total'] = rfm['recency_score'] + rfm['frequency_score'] + rfm['monetary_score']; assign_rfm_segment function with rules for Champion, Loyal, New Customer, At Risk, Lost, Big Spender, Regular"
+    },
+    {
+      "name": "build_customer_360_tier_assignment",
+      "component_type": "pandas_step",
+      "description": "Assigns customer tiers based on lifetime revenue and order count: Platinum (≥$50K revenue AND ≥50 orders), Gold (≥$20K AND ≥20), Silver (≥$5K AND ≥5), Bronze (all others)",
+      "input_tables": [
+        "order_agg"
+      ],
+      "output_columns": [
+        "customer_id",
+        "customer_tier"
+      ],
+      "sql_text": "def assign_tier(row): if row['lifetime_revenue'] >= 50000 and row['total_orders'] >= 50: return 'Platinum'; elif row['lifetime_revenue'] >= 20000 and row['total_orders'] >= 20: return 'Gold'; elif row['lifetime_revenue'] >= 5000 and row['total_orders'] >= 5: return 'Silver'; else: return 'Bronze'"
+    },
+    {
+      "name": "build_customer_360_ltv_prediction",
+      "component_type": "pandas_step",
+      "description": "Calculates predicted 3-year lifetime value by computing monthly spend rate (lifetime_revenue / months_active) and projecting 36 months forward, setting to 0 for customers inactive >365 days",
+      "input_tables": [
+        "order_agg"
+      ],
+      "output_columns": [
+        "customer_id",
+        "months_active",
+        "monthly_spend_rate",
+        "predicted_3yr_ltv"
+      ],
+      "sql_text": "order_agg['months_active'] = ((order_agg['last_order_date'] - order_agg['first_order_date']).dt.days / 30.44).clip(lower=1); order_agg['monthly_spend_rate'] = order_agg['lifetime_revenue'] / order_agg['months_active']; order_agg['predicted_3yr_ltv'] = np.where(order_agg['days_since_last_order'] > 365, 0, order_agg['monthly_spend_rate'] * 36)"
+    },
+    {
+      "name": "build_customer_360_final_merge",
+      "component_type": "pandas_step",
+      "description": "Merges all customer analytics components (demographics, transaction aggregations, product preferences, web engagement, RFM scores) into comprehensive customer 360 view with derived fields like full_name and NPS proxy",
+      "input_tables": [
+        "customers",
+        "order_agg",
+        "top_category",
+        "top_brand",
+        "distinct_products",
+        "web_agg",
+        "rfm"
+      ],
+      "output_columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "signup_date",
+        "country",
+        "region",
+        "segment",
+        "total_orders",
+        "first_order_date",
+        "last_order_date",
+        "lifetime_revenue",
+        "avg_order_value",
+        "total_discount_usd",
+        "total_tax_usd",
+        "online_orders",
+        "offline_orders",
+        "payment_methods",
+        "high_value_orders",
+        "days_since_last_order",
+        "online_pct",
+        "top_category",
+        "top_category_spend",
+        "top_brand",
+        "top_brand_spend",
+        "distinct_products",
+        "total_sessions",
+        "total_page_views",
+        "avg_page_views",
+        "total_events",
+        "conversion_count",
+        "last_session",
+        "mobile_sessions",
+        "conversion_rate",
+        "days_since_last_session",
+        "recency_score",
+        "frequency_score",
+        "monetary_score",
+        "rfm_total",
+        "rfm_segment",
+        "customer_tier",
+        "months_active",
+        "monthly_spend_rate",
+        "predicted_3yr_ltv",
+        "full_name",
+        "nps_proxy",
+        "etl_timestamp",
+        "model_version"
+      ],
+      "sql_text": "customers.merge(order_agg, on='customer_id', how='left').merge(top_category, on='customer_id', how='left').merge(top_brand, on='customer_id', how='left').merge(distinct_products, on='customer_id', how='left').merge(web_agg, on='customer_id', how='left').merge(rfm, on='customer_id', how='left'); c360['full_name'] = c360['first_name'] + ' ' + c360['last_name']; c360['nps_proxy'] = c360['rfm_segment'].map({'Champion': 'Promoter', 'Loyal': 'Promoter', 'Big Spender': 'Promoter', 'At Risk': 'Detractor', 'Lost': 'Detractor'}).fillna('Passive')"
+    },
+    {
+      "name": "build_product_performance",
+      "component_type": "pandas_step",
+      "description": "Builds product-level performance metrics by joining enriched order items with orders, aggregating by product to calculate quantity sold, revenue, margin, customer count, order count, sales dates, channel distribution, margin percentage, revenue ranking, and ABC classification based on cumulative revenue contribution",
+      "input_tables": [
+        "items_enriched",
+        "orders_usd"
+      ],
+      "output_columns": [
+        "product_id",
+        "product_name",
+        "category",
+        "sub_category",
+        "brand",
+        "total_quantity",
+        "total_revenue",
+        "total_margin",
+        "avg_unit_price",
+        "unique_customers",
+        "order_count",
+        "first_sale",
+        "last_sale",
+        "online_sales",
+        "avg_margin_pct",
+        "revenue_rank",
+        "abc_class",
+        "etl_timestamp"
+      ],
+      "sql_text": "joined = items_enriched.merge(orders[['order_id', 'customer_id', 'order_date', 'channel_group']], on='order_id'); joined.groupby(['product_id', 'product_name', 'category', 'sub_category', 'brand']).agg(total_quantity=('quantity', 'sum'), total_revenue=('line_total', 'sum'), total_margin=('margin', 'sum'), avg_unit_price=('unit_price', 'mean'), unique_customers=('customer_id', 'nunique'), order_count=('order_id', 'nunique'), first_sale=('order_date', 'min'), last_sale=('order_date', 'max'), online_sales=('channel_group', lambda x: (x == 'Online').sum())); ABC classification: pd.cut(cumrev_pct, bins=[0, 80, 95, 100.01], labels=['A', 'B', 'C'])"
+    },
+    {
+      "name": "build_daily_kpi",
+      "component_type": "pandas_step",
+      "description": "Builds daily KPI summary by grouping orders by date and calculating daily metrics: order count, unique customers, total revenue, average order value, total discounts, online orders, plus rolling 7-day and 30-day revenue/order totals and day-over-day revenue change percentage",
+      "input_tables": [
+        "orders_usd"
+      ],
+      "output_columns": [
+        "report_date",
+        "order_count",
+        "unique_customers",
+        "total_revenue",
+        "avg_order_value",
+        "total_discount",
+        "online_orders",
+        "rolling_7d_revenue",
+        "rolling_7d_orders",
+        "rolling_30d_revenue",
+        "dod_revenue_change",
+        "etl_timestamp"
+      ],
+      "sql_text": "orders.groupby(orders['order_date'].dt.date).agg(order_count=('order_id', 'nunique'), unique_customers=('customer_id', 'nunique'), total_revenue=('net_amount_usd', 'sum'), avg_order_value=('net_amount_usd', 'mean'), total_discount=('discount_amount_usd', 'sum'), online_orders=('channel_group', lambda x: (x == 'Online').sum())); daily['rolling_7d_revenue'] = daily['total_revenue'].rolling(7, min_periods=1).sum(); daily['dod_revenue_change'] = daily['total_revenue'].pct_change() * 100"
+    },
+    {
+      "name": "load_to_parquet_customer_360",
+      "component_type": "pandas_step",
+      "description": "Writes customer 360 DataFrame to Parquet file at output/customer_360.parquet using PyArrow engine",
+      "input_tables": [
+        "customer_360"
+      ],
+      "output_columns": [],
+      "sql_text": "df.to_parquet(OUTPUT_DIR / 'customer_360.parquet', index=False, engine='pyarrow')"
+    },
+    {
+      "name": "load_to_parquet_product_performance",
+      "component_type": "pandas_step",
+      "description": "Writes product performance DataFrame to Parquet file at output/product_performance.parquet using PyArrow engine",
+      "input_tables": [
+        "product_perf"
+      ],
+      "output_columns": [],
+      "sql_text": "df.to_parquet(OUTPUT_DIR / 'product_performance.parquet', index=False, engine='pyarrow')"
+    },
+    {
+      "name": "load_to_csv_daily_kpi",
+      "component_type": "pandas_step",
+      "description": "Writes daily KPI DataFrame to CSV file at output/daily_kpi.csv",
+      "input_tables": [
+        "daily_kpi"
+      ],
+      "output_columns": [],
+      "sql_text": "df.to_csv(OUTPUT_DIR / 'daily_kpi.csv', index=False)"
+    },
+    {
+      "name": "load_to_postgres_customer_summary",
+      "component_type": "pandas_step",
+      "description": "Writes customer 360 DataFrame to PostgreSQL table public.customer_summary using SQLAlchemy engine with replace mode",
+      "input_tables": [
+        "customer_360"
+      ],
+      "output_columns": [],
+      "sql_text": "df.to_sql('customer_summary', engine, schema='public', if_exists='replace', index=False)"
+    }
+  ],
+  "column_lineage": [
+    {
+      "target_table": "output/customer_360.parquet",
+      "target_column": "customer_id",
+      "source_columns": [
+        "data/customers.parquet.customer_id"
+      ],
+      "transformation": "customers.customer_id",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [],
+      "notes": "Primary key for customer identification"
+    },
+    {
+      "target_table": "output/customer_360.parquet",
+      "target_column": "total_orders",
+      "source_columns": [
+        "data/orders.csv.order_id"
+      ],
+      "transformation": "orders.groupby('customer_id')['order_id'].nunique()",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "clean_orders",
+          "expression": "df[~df['status'].isin(['cancelled', 'fraudulent'])]",
+          "output_column": "order_id"
+        },
+        {
+          "component_name": "build_customer_360_order_agg",
+          "expression": "orders.groupby('customer_id').agg(total_orders=('order_id', 'nunique'))",
+          "output_column": "total_orders"
+        }
+      ],
+      "notes": "Count of unique orders per customer, excluding cancelled and fraudulent orders"
+    },
+    {
+      "target_table": "output/customer_360.parquet",
+      "target_column": "lifetime_revenue",
+      "source_columns": [
+        "data/orders.csv.total_amount",
+        "data/orders.csv.discount_amount",
+        "data/orders.csv.tax_amount",
+        "data/orders.csv.currency",
+        "data/exchange_rates.csv.rate"
+      ],
+      "transformation": "orders.groupby('customer_id')['net_amount_usd'].sum() where net_amount_usd = (total_amount - discount_amount + tax_amount) * fx_rate",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "normalize_currency",
+          "expression": "df['net_amount_usd'] = df['total_amount_usd'] - df['discount_amount_usd'] + df['tax_amount_usd']",
+          "output_column": "net_amount_usd"
+        },
+        {
+          "component_name": "build_customer_360_order_agg",
+          "expression": "orders.groupby('customer_id').agg(lifetime_revenue=('net_amount_usd', 'sum'))",
+          "output_column": "lifetime_revenue"
+        }
+      ],
+      "notes": "Total revenue generated by customer in USD after currency conversion"
+    },
+    {
+      "target_table": "output/customer_360.parquet",
+      "target_column": "customer_tier",
+      "source_columns": [
+        "data/orders.csv.total_amount",
+        "data/orders.csv.order_id"
+      ],
+      "transformation": "IF lifetime_revenue >= 50000 AND total_orders >= 50 THEN 'Platinum' ELIF lifetime_revenue >= 20000 AND total_orders >= 20 THEN 'Gold' ELIF lifetime_revenue >= 5000 AND total_orders >= 5 THEN 'Silver' ELSE 'Bronze'",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "build_customer_360_tier_assignment",
+          "expression": "assign_tier function with revenue and order thresholds",
+          "output_column": "customer_tier"
+        }
+      ],
+      "notes": "Customer tier based on lifetime revenue and order frequency thresholds"
+    },
+    {
+      "target_table": "output/customer_360.parquet",
+      "target_column": "rfm_segment",
+      "source_columns": [
+        "data/orders.csv.order_date",
+        "data/orders.csv.order_id",
+        "data/orders.csv.total_amount"
+      ],
+      "transformation": "assign_rfm_segment based on recency_score, frequency_score, monetary_score quintiles",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "build_customer_360_rfm",
+          "expression": "pd.qcut for R/F/M scores + assign_rfm_segment function",
+          "output_column": "rfm_segment"
+        }
+      ],
+      "notes": "RFM-based customer segmentation (Champion, Loyal, At Risk, Lost, etc.)"
+    },
+    {
+      "target_table": "output/customer_360.parquet",
+      "target_column": "top_category",
+      "source_columns": [
+        "data/order_items.csv.line_total",
+        "data/products.parquet.category"
+      ],
+      "transformation": "category with MAX(SUM(line_total)) per customer",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "enrich_order_items",
+          "expression": "items.merge(products[['product_id', 'category']], on='product_id')",
+          "output_column": "category"
+        },
+        {
+          "component_name": "build_customer_360_top_category",
+          "expression": "cust_items.groupby(['customer_id', 'category']).agg(cat_spend=('line_total', 'sum')).sort_values('cat_spend', ascending=False).drop_duplicates('customer_id', keep='first')",
+          "output_column": "top_category"
+        }
+      ],
+      "notes": "Product category with highest customer spend"
+    },
+    {
+      "target_table": "output/customer_360.parquet",
+      "target_column": "conversion_rate",
+      "source_columns": [
+        "data/web_sessions.csv.converted",
+        "data/web_sessions.csv.session_id"
+      ],
+      "transformation": "SUM(converted) / COUNT(DISTINCT session_id) * 100 per customer",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "build_customer_360_web_agg",
+          "expression": "web_agg['conversion_rate'] = web_agg['conversion_count'] / web_agg['total_sessions'].replace(0, np.nan) * 100",
+          "output_column": "conversion_rate"
+        }
+      ],
+      "notes": "Percentage of web sessions that resulted in conversion"
+    },
+    {
+      "target_table": "output/customer_360.parquet",
+      "target_column": "predicted_3yr_ltv",
+      "source_columns": [
+        "data/orders.csv.order_date",
+        "data/orders.csv.total_amount"
+      ],
+      "transformation": "IF days_since_last_order > 365 THEN 0 ELSE (lifetime_revenue / months_active) * 36",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "build_customer_360_ltv_prediction",
+          "expression": "np.where(order_agg['days_since_last_order'] > 365, 0, order_agg['monthly_spend_rate'] * 36)",
+          "output_column": "predicted_3yr_ltv"
+        }
+      ],
+      "notes": "Predicted 3-year lifetime value based on monthly spend rate, set to 0 for inactive customers"
+    },
+    {
+      "target_table": "output/customer_360.parquet",
+      "target_column": "full_name",
+      "source_columns": [
+        "data/customers.parquet.first_name",
+        "data/customers.parquet.last_name"
+      ],
+      "transformation": "first_name + ' ' + last_name",
+      "transformation_type": "concatenation",
+      "intermediate_steps": [
+        {
+          "component_name": "build_customer_360_final_merge",
+          "expression": "c360['full_name'] = c360['first_name'] + ' ' + c360['last_name']",
+          "output_column": "full_name"
+        }
+      ],
+      "notes": "Customer full name concatenation"
+    },
+    {
+      "target_table": "output/product_performance.parquet",
+      "target_column": "total_revenue",
+      "source_columns": [
+        "data/order_items.csv.line_total"
+      ],
+      "transformation": "SUM(line_total) GROUP BY product_id",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "build_product_performance",
+          "expression": "joined.groupby(['product_id', 'product_name', 'category', 'sub_category', 'brand']).agg(total_revenue=('line_total', 'sum'))",
+          "output_column": "total_revenue"
+        }
+      ],
+      "notes": "Total revenue generated by each product"
+    },
+    {
+      "target_table": "output/product_performance.parquet",
+      "target_column": "total_margin",
+      "source_columns": [
+        "data/order_items.csv.line_total",
+        "data/order_items.csv.quantity",
+        "data/products.parquet.cost_price"
+      ],
+      "transformation": "SUM(line_total - (cost_price * quantity)) GROUP BY product_id",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "enrich_order_items",
+          "expression": "df['margin'] = df['line_total'] - (df['cost_price'] * df['quantity'])",
+          "output_column": "margin"
+        },
+        {
+          "component_name": "build_product_performance",
+          "expression": "joined.groupby(['product_id', 'product_name', 'category', 'sub_category', 'brand']).agg(total_margin=('margin', 'sum'))",
+          "output_column": "total_margin"
+        }
+      ],
+      "notes": "Total margin earned from each product"
+    },
+    {
+      "target_table": "output/product_performance.parquet",
+      "target_column": "abc_class",
+      "source_columns": [
+        "data/order_items.csv.line_total"
+      ],
+      "transformation": "pd.cut(cumulative_revenue_pct, bins=[0, 80, 95, 100.01], labels=['A', 'B', 'C'])",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "build_product_performance",
+          "expression": "cumulative['cumrev_pct'] = cumulative['total_revenue'].cumsum() / cumulative['total_revenue'].sum() * 100; pd.cut(cumulative['cumrev_pct'], bins=[0, 80, 95, 100.01], labels=['A', 'B', 'C'])",
+          "output_column": "abc_class"
+        }
+      ],
+      "notes": "ABC classification: A=top 80% revenue contributors, B=80-95%, C=95-100%"
+    },
+    {
+      "target_table": "output/daily_kpi.csv",
+      "target_column": "total_revenue",
+      "source_columns": [
+        "data/orders.csv.total_amount",
+        "data/orders.csv.discount_amount",
+        "data/orders.csv.tax_amount",
+        "data/exchange_rates.csv.rate"
+      ],
+      "transformation": "SUM(net_amount_usd) GROUP BY order_date::date",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "normalize_currency",
+          "expression": "df['net_amount_usd'] = df['total_amount_usd'] - df['discount_amount_usd'] + df['tax_amount_usd']",
+          "output_column": "net_amount_usd"
+        },
+        {
+          "component_name": "build_daily_kpi",
+          "expression": "orders.groupby(orders['order_date'].dt.date).agg(total_revenue=('net_amount_usd', 'sum'))",
+          "output_column": "total_revenue"
+        }
+      ],
+      "notes": "Daily total revenue in USD"
+    },
+    {
+      "target_table": "output/daily_kpi.csv",
+      "target_column": "rolling_7d_revenue",
+      "source_columns": [
+        "data/orders.csv.total_amount",
+        "data/orders.csv.order_date"
+      ],
+      "transformation": "total_revenue.rolling(7, min_periods=1).sum()",
+      "transformation_type": "window_function",
+      "intermediate_steps": [
+        {
+          "component_name": "build_daily_kpi",
+          "expression": "daily['rolling_7d_revenue'] = daily['total_revenue'].rolling(7, min_periods=1).sum()",
+          "output_column": "rolling_7d_revenue"
+        }
+      ],
+      "notes": "7-day rolling sum of daily revenue"
+    },
+    {
+      "target_table": "output/daily_kpi.csv",
+      "target_column": "dod_revenue_change",
+      "source_columns": [
+        "data/orders.csv.total_amount"
+      ],
+      "transformation": "total_revenue.pct_change() * 100",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "build_daily_kpi",
+          "expression": "daily['dod_revenue_change'] = daily['total_revenue'].pct_change() * 100",
+          "output_column": "dod_revenue_change"
+        }
+      ],
+      "notes": "Day-over-day revenue change percentage"
+    },
+    {
+      "target_table": "public.customer_summary",
+      "target_column": "customer_id",
+      "source_columns": [
+        "data/customers.parquet.customer_id"
+      ],
+      "transformation": "customers.customer_id",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "build_customer_360_final_merge",
+          "expression": "customers.merge(...)",
+          "output_column": "customer_id"
+        }
+      ],
+      "notes": "Same as customer_360.parquet - direct copy to PostgreSQL"
+    }
+  ],
+  "data_flow_edges": [
+    {
+      "from_node": "data/orders.csv",
+      "to_node": "clean_orders",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "channel",
+        "currency",
+        "status"
+      ],
+      "edge_label": "extract orders with date parsing and type coercion"
+    },
+    {
+      "from_node": "data/order_items.csv",
+      "to_node": "enrich_order_items",
+      "columns": [
+        "item_id",
+        "order_id",
+        "product_id",
+        "quantity",
+        "unit_price",
+        "line_total"
+      ],
+      "edge_label": "extract order line items"
+    },
+    {
+      "from_node": "data/customers.parquet",
+      "to_node": "build_customer_360_final_merge",
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "signup_date",
+        "country",
+        "region",
+        "segment"
+      ],
+      "edge_label": "extract customer demographics"
+    },
+    {
+      "from_node": "data/products.parquet",
+      "to_node": "enrich_order_items",
+      "columns": [
+        "product_id",
+        "product_name",
+        "category",
+        "sub_category",
+        "brand",
+        "cost_price",
+        "is_digital"
+      ],
+      "edge_label": "left join on product_id for category and cost data"
+    },
+    {
+      "from_node": "data/exchange_rates.csv",
+      "to_node": "normalize_currency",
+      "columns": [
+        "from_currency",
+        "to_currency",
+        "rate",
+        "rate_date"
+      ],
+      "edge_label": "lookup latest exchange rates for currency conversion"
+    },
+    {
+      "from_node": "data/web_sessions.csv",
+      "to_node": "build_customer_360_web_agg",
+      "columns": [
+        "session_id",
+        "customer_id",
+        "page_views",
+        "events",
+        "device_type",
+        "converted",
+        "session_start"
+      ],
+      "edge_label": "extract web engagement data"
+    },
+    {
+      "from_node": "clean_orders",
+      "to_node": "normalize_currency",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "currency",
+        "channel_group",
+        "is_high_value"
+      ],
+      "edge_label": "filter: status NOT IN ('cancelled', 'fraudulent'), normalize channels, flag high-value orders"
+    },
+    {
+      "from_node": "normalize_currency",
+      "to_node": "build_customer_360_order_agg",
+      "columns": [
+        "customer_id",
+        "order_id",
+        "order_date",
+        "net_amount_usd",
+        "discount_amount_usd",
+        "tax_amount_usd",
+        "channel_group",
+        "payment_method",
+        "is_high_value"
+      ],
+      "edge_label": "currency converted to USD using latest exchange rates"
+    },
+    {
+      "from_node": "normalize_currency",
+      "to_node": "build_product_performance",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "channel_group"
+      ],
+      "edge_label": "order context for product performance analysis"
+    },
+    {
+      "from_node": "normalize_currency",
+      "to_node": "build_daily_kpi",
+      "columns": [
+        "order_date",
+        "order_id",
+        "customer_id",
+        "net_amount_usd",
+        "discount_amount_usd",
+        "channel_group"
+      ],
+      "edge_label": "daily aggregation of order metrics"
+    },
+    {
+      "from_node": "enrich_order_items",
+      "to_node": "build_customer_360_top_category",
+      "columns": [
+        "order_id",
+        "product_id",
+        "line_total",
+        "category",
+        "brand"
+      ],
+      "edge_label": "join with products for category/brand analysis and margin calculation"
+    },
+    {
+      "from_node": "enrich_order_items",
+      "to_node": "build_product_performance",
+      "columns": [
+        "product_id",
+        "product_name",
+        "category",
+        "sub_category",
+        "brand",
+        "quantity",
+        "line_total",
+        "margin",
+        "unit_price"
+      ],
+      "edge_label": "product-level aggregation with margin calculations"
+    },
+    {
+      "from_node": "build_customer_360_order_agg",
+      "to_node": "build_customer_360_rfm",
+      "columns": [
+        "customer_id",
+        "days_since_last_order",
+        "total_orders",
+        "lifetime_revenue"
+      ],
+      "edge_label": "RFM scoring based on recency, frequency, monetary values"
+    },
+    {
+      "from_node": "build_customer_360_order_agg",
+      "to_node": "build_customer_360_tier_assignment",
+      "columns": [
+        "customer_id",
+        "lifetime_revenue",
+        "total_orders"
+      ],
+      "edge_label": "customer tier assignment based on revenue and order thresholds"
+    },
+    {
+      "from_node": "build_customer_360_order_agg",
+      "to_node": "build_customer_360_ltv_prediction",
+      "columns": [
+        "customer_id",
+        "first_order_date",
+        "last_order_date",
+        "lifetime_revenue",
+        "days_since_last_order"
+      ],
+      "edge_label": "LTV prediction based on historical spend patterns"
+    },
+    {
+      "from_node": "build_customer_360_top_category",
+      "to_node": "build_customer_360_final_merge",
+      "columns": [
+        "customer_id",
+        "top_category",
+        "top_category_spend"
+      ],
+      "edge_label": "customer's highest spending category"
+    },
+    {
+      "from_node": "build_customer_360_top_brand",
+      "to_node": "build_customer_360_final_merge",
+      "columns": [
+        "customer_id",
+        "top_brand",
+        "top_brand_spend"
+      ],
+      "edge_label": "customer's highest spending brand"
+    },
+    {
+      "from_node": "build_customer_360_distinct_products",
+      "to_node": "build_customer_360_final_merge",
+      "columns": [
+        "customer_id",
+        "distinct_products"
+      ],
+      "edge_label": "count of unique products purchased"
+    },
+    {
+      "from_node": "build_customer_360_web_agg",
+      "to_node": "build_customer_360_final_merge",
+      "columns": [
+        "customer_id",
+        "total_sessions",
+        "total_page_views",
+        "avg_page_views",
+        "total_events",
+        "conversion_count",
+        "conversion_rate",
+        "last_session",
+        "mobile_sessions",
+        "days_since_last_session"
+      ],
+      "edge_label": "web engagement metrics aggregated by customer"
+    },
+    {
+      "from_node": "build_customer_360_rfm",
+      "to_node": "build_customer_360_final_merge",
+      "columns": [
+        "customer_id",
+        "recency_score",
+        "frequency_score",
+        "monetary_score",
+        "rfm_total",
+        "rfm_segment"
+      ],
+      "edge_label": "RFM scores and segment classification"
+    },
+    {
+      "from_node": "build_customer_360_final_merge",
+      "to_node": "output/customer_360.parquet",
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "total_orders",
+        "lifetime_revenue",
+        "customer_tier",
+        "rfm_segment",
+        "top_category",
+        "conversion_rate",
+        "predicted_3yr_ltv",
+        "full_name",
+        "nps_proxy",
+        "etl_timestamp",
+        "model_version"
+      ],
+      "edge_label": "comprehensive customer 360 view with derived fields"
+    },
+    {
+      "from_node": "build_customer_360_final_merge",
+      "to_node": "public.customer_summary",
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "total_orders",
+        "lifetime_revenue",
+        "customer_tier",
+        "rfm_segment",
+        "top_category",
+        "conversion_rate",
+        "predicted_3yr_ltv",
+        "full_name",
+        "nps_proxy",
+        "etl_timestamp",
+        "model_version"
+      ],
+      "edge_label": "same customer 360 data loaded to PostgreSQL"
+    },
+    {
+      "from_node": "build_product_performance",
+      "to_node": "output/product_performance.parquet",
+      "columns": [
+        "product_id",
+        "product_name",
+        "category",
+        "brand",
+        "total_quantity",
+        "total_revenue",
+        "total_margin",
+        "avg_unit_price",
+        "unique_customers",
+        "order_count",
+        "avg_margin_pct",
+        "revenue_rank",
+        "abc_class",
+        "etl_timestamp"
+      ],
+      "edge_label": "product performance metrics with ABC classification"
+    },
+    {
+      "from_node": "build_daily_kpi",
+      "to_node": "output/daily_kpi.csv",
+      "columns": [
+        "report_date",
+        "order_count",
+        "unique_customers",
+        "total_revenue",
+        "avg_order_value",
+        "total_discount",
+        "online_orders",
+        "rolling_7d_revenue",
+        "rolling_7d_orders",
+        "rolling_30d_revenue",
+        "dod_revenue_change",
+        "etl_timestamp"
+      ],
+      "edge_label": "daily KPI summary with rolling metrics and day-over-day changes"
+    }
+  ]
+}

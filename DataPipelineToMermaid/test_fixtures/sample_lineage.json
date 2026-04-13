@@ -1,0 +1,231 @@
+{
+  "pipeline_name": "Customer Analytics ETL",
+  "pipeline_type": "sql_query",
+  "source_file": "test_fixtures/complex_sql_ctes.sql",
+  "description": "Aggregates customer orders with product details into a summary analytics table, using CTEs for staged transformations.",
+  "sources": [
+    {
+      "schema_name": "sales",
+      "table_name": "customers",
+      "columns": [
+        {"name": "customer_id", "data_type": "INT", "description": "Primary key"},
+        {"name": "first_name", "data_type": "VARCHAR(100)", "description": "Customer first name"},
+        {"name": "last_name", "data_type": "VARCHAR(100)", "description": "Customer last name"},
+        {"name": "email", "data_type": "VARCHAR(255)", "description": "Email address"},
+        {"name": "signup_date", "data_type": "DATE", "description": "Account creation date"},
+        {"name": "status", "data_type": "VARCHAR(20)", "description": "active/inactive/suspended"},
+        {"name": "region", "data_type": "VARCHAR(50)", "description": "Geographic region"}
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "sales",
+      "table_name": "orders",
+      "columns": [
+        {"name": "order_id", "data_type": "INT", "description": "Primary key"},
+        {"name": "customer_id", "data_type": "INT", "description": "FK to customers"},
+        {"name": "order_date", "data_type": "DATE", "description": "Date order was placed"},
+        {"name": "total_amount", "data_type": "DECIMAL(12,2)", "description": "Order total"},
+        {"name": "status", "data_type": "VARCHAR(20)", "description": "pending/shipped/delivered/cancelled"},
+        {"name": "discount_pct", "data_type": "DECIMAL(5,2)", "description": "Discount percentage applied"}
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "sales",
+      "table_name": "order_items",
+      "columns": [
+        {"name": "item_id", "data_type": "INT", "description": "Primary key"},
+        {"name": "order_id", "data_type": "INT", "description": "FK to orders"},
+        {"name": "product_id", "data_type": "INT", "description": "FK to products"},
+        {"name": "quantity", "data_type": "INT", "description": "Quantity ordered"},
+        {"name": "unit_price", "data_type": "DECIMAL(10,2)", "description": "Price per unit"}
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "products",
+      "table_name": "products",
+      "columns": [
+        {"name": "product_id", "data_type": "INT", "description": "Primary key"},
+        {"name": "product_name", "data_type": "VARCHAR(200)", "description": "Product name"},
+        {"name": "category", "data_type": "VARCHAR(100)", "description": "Product category"}
+      ],
+      "table_type": "source"
+    }
+  ],
+  "targets": [
+    {
+      "schema_name": "analytics",
+      "table_name": "customer_summary",
+      "columns": [
+        {"name": "customer_id", "data_type": "INT", "description": "Customer identifier"},
+        {"name": "customer_name", "data_type": "VARCHAR(201)", "description": "Full name"},
+        {"name": "email", "data_type": "VARCHAR(255)", "description": "Email"},
+        {"name": "region", "data_type": "VARCHAR(50)", "description": "Region"},
+        {"name": "total_orders", "data_type": "INT", "description": "Count of orders"},
+        {"name": "total_revenue", "data_type": "DECIMAL(14,2)", "description": "Sum of order amounts"},
+        {"name": "avg_order_value", "data_type": "DECIMAL(10,2)", "description": "Average order value"},
+        {"name": "top_category", "data_type": "VARCHAR(100)", "description": "Most ordered product category"},
+        {"name": "customer_tier", "data_type": "VARCHAR(20)", "description": "gold/silver/bronze"},
+        {"name": "days_since_signup", "data_type": "INT", "description": "Days since account creation"}
+      ],
+      "table_type": "target"
+    }
+  ],
+  "components": [
+    {
+      "name": "cte_active_customers",
+      "component_type": "CTE",
+      "description": "Filters to only active customers",
+      "input_tables": ["sales.customers"],
+      "output_columns": ["customer_id", "first_name", "last_name", "email", "signup_date", "region"],
+      "sql_text": "SELECT customer_id, first_name, last_name, email, signup_date, region FROM sales.customers WHERE status = 'active'"
+    },
+    {
+      "name": "cte_order_stats",
+      "component_type": "CTE",
+      "description": "Aggregates order statistics per customer",
+      "input_tables": ["sales.orders"],
+      "output_columns": ["customer_id", "total_orders", "total_revenue", "avg_order_value"],
+      "sql_text": "SELECT customer_id, COUNT(*) as total_orders, SUM(total_amount) as total_revenue, AVG(total_amount) as avg_order_value FROM sales.orders GROUP BY customer_id"
+    },
+    {
+      "name": "cte_top_category",
+      "component_type": "CTE",
+      "description": "Finds the top product category for each customer using ROW_NUMBER",
+      "input_tables": ["sales.order_items", "sales.orders", "products.products"],
+      "output_columns": ["customer_id", "category", "rn"],
+      "sql_text": "SELECT o.customer_id, p.category, ROW_NUMBER() OVER (PARTITION BY o.customer_id ORDER BY COUNT(*) DESC) as rn ..."
+    },
+    {
+      "name": "cte_customer_tier",
+      "component_type": "CTE",
+      "description": "Assigns tier based on total revenue using CASE",
+      "input_tables": ["cte_order_stats"],
+      "output_columns": ["customer_id", "customer_tier"],
+      "sql_text": "SELECT customer_id, CASE WHEN total_revenue > 10000 THEN 'gold' WHEN total_revenue > 5000 THEN 'silver' ELSE 'bronze' END as customer_tier ..."
+    }
+  ],
+  "column_lineage": [
+    {
+      "target_table": "analytics.customer_summary",
+      "target_column": "customer_id",
+      "source_columns": ["sales.customers.customer_id"],
+      "transformation": "sales.customers.customer_id",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {"component_name": "cte_active_customers", "expression": "customer_id", "output_column": "customer_id"}
+      ],
+      "notes": "Filtered to active customers only"
+    },
+    {
+      "target_table": "analytics.customer_summary",
+      "target_column": "customer_name",
+      "source_columns": ["sales.customers.first_name", "sales.customers.last_name"],
+      "transformation": "CONCAT(first_name, ' ', last_name)",
+      "transformation_type": "concatenation",
+      "intermediate_steps": [
+        {"component_name": "cte_active_customers", "expression": "first_name, last_name", "output_column": "first_name, last_name"}
+      ],
+      "notes": ""
+    },
+    {
+      "target_table": "analytics.customer_summary",
+      "target_column": "email",
+      "source_columns": ["sales.customers.email"],
+      "transformation": "email",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [],
+      "notes": ""
+    },
+    {
+      "target_table": "analytics.customer_summary",
+      "target_column": "region",
+      "source_columns": ["sales.customers.region"],
+      "transformation": "region",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [],
+      "notes": ""
+    },
+    {
+      "target_table": "analytics.customer_summary",
+      "target_column": "total_orders",
+      "source_columns": ["sales.orders.order_id"],
+      "transformation": "COUNT(*)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {"component_name": "cte_order_stats", "expression": "COUNT(*)", "output_column": "total_orders"}
+      ],
+      "notes": "Count of all orders per customer"
+    },
+    {
+      "target_table": "analytics.customer_summary",
+      "target_column": "total_revenue",
+      "source_columns": ["sales.orders.total_amount"],
+      "transformation": "SUM(total_amount)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {"component_name": "cte_order_stats", "expression": "SUM(total_amount)", "output_column": "total_revenue"}
+      ],
+      "notes": ""
+    },
+    {
+      "target_table": "analytics.customer_summary",
+      "target_column": "avg_order_value",
+      "source_columns": ["sales.orders.total_amount"],
+      "transformation": "AVG(total_amount)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {"component_name": "cte_order_stats", "expression": "AVG(total_amount)", "output_column": "avg_order_value"}
+      ],
+      "notes": ""
+    },
+    {
+      "target_table": "analytics.customer_summary",
+      "target_column": "top_category",
+      "source_columns": ["products.products.category", "sales.order_items.product_id", "sales.orders.customer_id"],
+      "transformation": "ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY COUNT(*) DESC) — pick rn=1",
+      "transformation_type": "window_function",
+      "intermediate_steps": [
+        {"component_name": "cte_top_category", "expression": "ROW_NUMBER() OVER (...) as rn, p.category", "output_column": "category"}
+      ],
+      "notes": "Most frequently ordered product category"
+    },
+    {
+      "target_table": "analytics.customer_summary",
+      "target_column": "customer_tier",
+      "source_columns": ["sales.orders.total_amount"],
+      "transformation": "CASE WHEN SUM(total_amount) > 10000 THEN 'gold' WHEN > 5000 THEN 'silver' ELSE 'bronze' END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {"component_name": "cte_order_stats", "expression": "SUM(total_amount)", "output_column": "total_revenue"},
+        {"component_name": "cte_customer_tier", "expression": "CASE WHEN total_revenue > 10000 ...", "output_column": "customer_tier"}
+      ],
+      "notes": "Tier assigned based on lifetime revenue"
+    },
+    {
+      "target_table": "analytics.customer_summary",
+      "target_column": "days_since_signup",
+      "source_columns": ["sales.customers.signup_date"],
+      "transformation": "DATEDIFF(DAY, signup_date, GETDATE())",
+      "transformation_type": "date_manipulation",
+      "intermediate_steps": [
+        {"component_name": "cte_active_customers", "expression": "signup_date", "output_column": "signup_date"}
+      ],
+      "notes": ""
+    }
+  ],
+  "data_flow_edges": [
+    {"from_node": "sales.customers", "to_node": "cte_active_customers", "columns": ["customer_id", "first_name", "last_name", "email", "signup_date", "region"], "edge_label": "WHERE status='active'"},
+    {"from_node": "sales.orders", "to_node": "cte_order_stats", "columns": ["customer_id", "total_amount"], "edge_label": "GROUP BY customer_id"},
+    {"from_node": "sales.orders", "to_node": "cte_top_category", "columns": ["customer_id", "order_id"], "edge_label": ""},
+    {"from_node": "sales.order_items", "to_node": "cte_top_category", "columns": ["order_id", "product_id"], "edge_label": "JOIN on order_id"},
+    {"from_node": "products.products", "to_node": "cte_top_category", "columns": ["product_id", "category"], "edge_label": "JOIN on product_id"},
+    {"from_node": "cte_order_stats", "to_node": "cte_customer_tier", "columns": ["customer_id", "total_revenue"], "edge_label": "CASE logic"},
+    {"from_node": "cte_active_customers", "to_node": "analytics.customer_summary", "columns": ["customer_id", "first_name", "last_name", "email", "signup_date", "region"], "edge_label": ""},
+    {"from_node": "cte_order_stats", "to_node": "analytics.customer_summary", "columns": ["total_orders", "total_revenue", "avg_order_value"], "edge_label": ""},
+    {"from_node": "cte_top_category", "to_node": "analytics.customer_summary", "columns": ["category"], "edge_label": "WHERE rn=1"},
+    {"from_node": "cte_customer_tier", "to_node": "analytics.customer_summary", "columns": ["customer_tier"], "edge_label": ""}
+  ]
+}

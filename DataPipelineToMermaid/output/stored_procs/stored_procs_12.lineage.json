@@ -1,0 +1,2604 @@
+{
+  "pipeline_name": "Order Management & Reporting ETL Pipeline",
+  "pipeline_type": "stored_procedures",
+  "source_file": "DataPipelineToMermaid/test_fixtures/stored_procs_12.sql",
+  "description": "Comprehensive order management and reporting pipeline that processes customer orders, calculates revenue metrics, manages inventory, generates customer analytics, and produces executive dashboards. The pipeline handles order lifecycle from staging through fulfillment, computes customer lifetime value and engagement scores, tracks product performance, and maintains data quality through validation and archival processes.",
+  "sources": [
+    {
+      "schema_name": "dbo",
+      "table_name": "Orders",
+      "columns": [
+        {
+          "name": "order_id",
+          "data_type": "INT",
+          "description": "Unique identifier for each order"
+        },
+        {
+          "name": "customer_id",
+          "data_type": "INT",
+          "description": "Foreign key to customer who placed the order"
+        },
+        {
+          "name": "order_date",
+          "data_type": "DATE",
+          "description": "Date when the order was placed"
+        },
+        {
+          "name": "status",
+          "data_type": "VARCHAR",
+          "description": "Current order status (confirmed, cancelled, delivered, returned, pending)"
+        },
+        {
+          "name": "channel",
+          "data_type": "VARCHAR",
+          "description": "Sales channel where order originated (web, mobile, store)"
+        },
+        {
+          "name": "payment_method",
+          "data_type": "VARCHAR",
+          "description": "Payment method used for the order"
+        },
+        {
+          "name": "shipping_method",
+          "data_type": "VARCHAR",
+          "description": "Shipping method selected (standard, express, priority)"
+        },
+        {
+          "name": "shipping_cost",
+          "data_type": "DECIMAL",
+          "description": "Cost of shipping for the order"
+        },
+        {
+          "name": "external_ref",
+          "data_type": "VARCHAR",
+          "description": "External reference ID for order tracking"
+        },
+        {
+          "name": "created_at",
+          "data_type": "DATETIME",
+          "description": "Timestamp when order record was created"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "OrderItems",
+      "columns": [
+        {
+          "name": "item_id",
+          "data_type": "INT",
+          "description": "Unique identifier for each order line item"
+        },
+        {
+          "name": "order_id",
+          "data_type": "INT",
+          "description": "Foreign key to the parent order"
+        },
+        {
+          "name": "product_id",
+          "data_type": "INT",
+          "description": "Foreign key to the product being ordered"
+        },
+        {
+          "name": "quantity",
+          "data_type": "INT",
+          "description": "Number of units ordered"
+        },
+        {
+          "name": "unit_price",
+          "data_type": "DECIMAL",
+          "description": "Price per unit at time of order"
+        },
+        {
+          "name": "discount_amount",
+          "data_type": "DECIMAL",
+          "description": "Total discount applied to this line item"
+        },
+        {
+          "name": "return_amount",
+          "data_type": "DECIMAL",
+          "description": "Amount refunded if item was returned"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "Customers",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "INT",
+          "description": "Unique identifier for each customer"
+        },
+        {
+          "name": "first_name",
+          "data_type": "VARCHAR",
+          "description": "Customer's first name"
+        },
+        {
+          "name": "last_name",
+          "data_type": "VARCHAR",
+          "description": "Customer's last name"
+        },
+        {
+          "name": "email",
+          "data_type": "VARCHAR",
+          "description": "Customer's email address"
+        },
+        {
+          "name": "state",
+          "data_type": "VARCHAR",
+          "description": "Customer's state for tax calculation"
+        },
+        {
+          "name": "signup_date",
+          "data_type": "DATE",
+          "description": "Date when customer account was created"
+        },
+        {
+          "name": "status",
+          "data_type": "VARCHAR",
+          "description": "Customer account status (active, inactive)"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "Products",
+      "columns": [
+        {
+          "name": "product_id",
+          "data_type": "INT",
+          "description": "Unique identifier for each product"
+        },
+        {
+          "name": "product_name",
+          "data_type": "VARCHAR",
+          "description": "Name of the product"
+        },
+        {
+          "name": "category",
+          "data_type": "VARCHAR",
+          "description": "Product category classification"
+        },
+        {
+          "name": "sku",
+          "data_type": "VARCHAR",
+          "description": "Stock keeping unit identifier"
+        },
+        {
+          "name": "cost_price",
+          "data_type": "DECIMAL",
+          "description": "Cost of goods sold per unit"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "Inventory",
+      "columns": [
+        {
+          "name": "product_id",
+          "data_type": "INT",
+          "description": "Foreign key to product"
+        },
+        {
+          "name": "warehouse_id",
+          "data_type": "INT",
+          "description": "Warehouse location identifier"
+        },
+        {
+          "name": "quantity_on_hand",
+          "data_type": "INT",
+          "description": "Total units available in warehouse"
+        },
+        {
+          "name": "quantity_reserved",
+          "data_type": "INT",
+          "description": "Units reserved for pending orders"
+        },
+        {
+          "name": "reorder_point",
+          "data_type": "INT",
+          "description": "Minimum stock level before reordering"
+        },
+        {
+          "name": "last_restock_date",
+          "data_type": "DATE",
+          "description": "Date of last inventory replenishment"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "TaxRates",
+      "columns": [
+        {
+          "name": "state",
+          "data_type": "VARCHAR",
+          "description": "State code for tax jurisdiction"
+        },
+        {
+          "name": "tax_rate",
+          "data_type": "DECIMAL",
+          "description": "Tax rate percentage for the state"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "CustomerAddresses",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "INT",
+          "description": "Foreign key to customer"
+        },
+        {
+          "name": "address_type",
+          "data_type": "VARCHAR",
+          "description": "Type of address (shipping, billing)"
+        },
+        {
+          "name": "region",
+          "data_type": "VARCHAR",
+          "description": "Geographic region for shipping and reporting"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "ShippingProviders",
+      "columns": [
+        {
+          "name": "provider_name",
+          "data_type": "VARCHAR",
+          "description": "Name of shipping provider"
+        },
+        {
+          "name": "avg_delivery_days",
+          "data_type": "INT",
+          "description": "Average delivery time in days"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "Promotions",
+      "columns": [
+        {
+          "name": "product_id",
+          "data_type": "INT",
+          "description": "Product eligible for promotion"
+        },
+        {
+          "name": "discount_pct",
+          "data_type": "DECIMAL",
+          "description": "Discount percentage for promotion"
+        },
+        {
+          "name": "is_active",
+          "data_type": "BIT",
+          "description": "Whether promotion is currently active"
+        },
+        {
+          "name": "start_date",
+          "data_type": "DATE",
+          "description": "Promotion start date"
+        },
+        {
+          "name": "end_date",
+          "data_type": "DATE",
+          "description": "Promotion end date"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "staging",
+      "table_name": "RawOrderFeed",
+      "columns": [
+        {
+          "name": "raw_id",
+          "data_type": "VARCHAR",
+          "description": "Raw order identifier from external system"
+        },
+        {
+          "name": "email",
+          "data_type": "VARCHAR",
+          "description": "Customer email from raw feed"
+        },
+        {
+          "name": "sku",
+          "data_type": "VARCHAR",
+          "description": "Product SKU from raw feed"
+        },
+        {
+          "name": "qty",
+          "data_type": "INT",
+          "description": "Quantity ordered from raw feed"
+        },
+        {
+          "name": "price",
+          "data_type": "DECIMAL",
+          "description": "Unit price from raw feed"
+        },
+        {
+          "name": "order_date_text",
+          "data_type": "VARCHAR",
+          "description": "Order date as text string from raw feed"
+        },
+        {
+          "name": "currency",
+          "data_type": "VARCHAR",
+          "description": "Currency code from raw feed"
+        },
+        {
+          "name": "channel",
+          "data_type": "VARCHAR",
+          "description": "Sales channel from raw feed"
+        },
+        {
+          "name": "processed",
+          "data_type": "BIT",
+          "description": "Flag indicating if record has been processed"
+        }
+      ],
+      "table_type": "source"
+    }
+  ],
+  "targets": [
+    {
+      "schema_name": "dbo",
+      "table_name": "OrderSummary",
+      "columns": [
+        {
+          "name": "order_id",
+          "data_type": "INT",
+          "description": "Unique order identifier"
+        },
+        {
+          "name": "customer_id",
+          "data_type": "INT",
+          "description": "Customer who placed the order"
+        },
+        {
+          "name": "customer_name",
+          "data_type": "VARCHAR",
+          "description": "Full customer name for reporting"
+        },
+        {
+          "name": "customer_email",
+          "data_type": "VARCHAR",
+          "description": "Customer email address"
+        },
+        {
+          "name": "order_date",
+          "data_type": "DATE",
+          "description": "Date order was placed"
+        },
+        {
+          "name": "order_status",
+          "data_type": "VARCHAR",
+          "description": "Current status of the order"
+        },
+        {
+          "name": "item_count",
+          "data_type": "INT",
+          "description": "Total number of line items in order"
+        },
+        {
+          "name": "subtotal",
+          "data_type": "DECIMAL",
+          "description": "Sum of all line item amounts before tax and shipping"
+        },
+        {
+          "name": "discount_total",
+          "data_type": "DECIMAL",
+          "description": "Total discounts applied to order"
+        },
+        {
+          "name": "tax_total",
+          "data_type": "DECIMAL",
+          "description": "Total tax amount for order"
+        },
+        {
+          "name": "shipping_total",
+          "data_type": "DECIMAL",
+          "description": "Shipping cost for order"
+        },
+        {
+          "name": "grand_total",
+          "data_type": "DECIMAL",
+          "description": "Final order total including all charges"
+        },
+        {
+          "name": "payment_method",
+          "data_type": "VARCHAR",
+          "description": "Payment method used"
+        },
+        {
+          "name": "shipping_method",
+          "data_type": "VARCHAR",
+          "description": "Shipping method selected"
+        },
+        {
+          "name": "estimated_delivery",
+          "data_type": "DATE",
+          "description": "Estimated delivery date"
+        },
+        {
+          "name": "region",
+          "data_type": "VARCHAR",
+          "description": "Customer's shipping region"
+        },
+        {
+          "name": "etl_timestamp",
+          "data_type": "DATETIME",
+          "description": "When this summary record was created"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "DailyRevenue",
+      "columns": [
+        {
+          "name": "report_date",
+          "data_type": "DATE",
+          "description": "Date for which revenue is reported"
+        },
+        {
+          "name": "region",
+          "data_type": "VARCHAR",
+          "description": "Geographic region"
+        },
+        {
+          "name": "channel",
+          "data_type": "VARCHAR",
+          "description": "Sales channel"
+        },
+        {
+          "name": "order_count",
+          "data_type": "INT",
+          "description": "Number of orders placed"
+        },
+        {
+          "name": "revenue",
+          "data_type": "DECIMAL",
+          "description": "Total revenue for the day"
+        },
+        {
+          "name": "avg_order_value",
+          "data_type": "DECIMAL",
+          "description": "Average order value"
+        },
+        {
+          "name": "new_customers",
+          "data_type": "INT",
+          "description": "Number of new customers acquired"
+        },
+        {
+          "name": "created_at",
+          "data_type": "DATETIME",
+          "description": "When record was created"
+        },
+        {
+          "name": "updated_at",
+          "data_type": "DATETIME",
+          "description": "When record was last updated"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "CustomerLifetimeValue",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "INT",
+          "description": "Customer identifier"
+        },
+        {
+          "name": "total_orders",
+          "data_type": "INT",
+          "description": "Total number of orders placed by customer"
+        },
+        {
+          "name": "total_spend",
+          "data_type": "DECIMAL",
+          "description": "Total amount spent by customer"
+        },
+        {
+          "name": "avg_order_value",
+          "data_type": "DECIMAL",
+          "description": "Average order value for customer"
+        },
+        {
+          "name": "months_active",
+          "data_type": "INT",
+          "description": "Number of months between first and last order"
+        },
+        {
+          "name": "last_order_date",
+          "data_type": "DATE",
+          "description": "Date of customer's most recent order"
+        },
+        {
+          "name": "days_dormant",
+          "data_type": "INT",
+          "description": "Days since last order"
+        },
+        {
+          "name": "predicted_annual_value",
+          "data_type": "DECIMAL",
+          "description": "Projected annual spending based on historical patterns"
+        },
+        {
+          "name": "decile_rank",
+          "data_type": "INT",
+          "description": "Customer ranking by total spend (1=top 10%, 10=bottom 10%)"
+        },
+        {
+          "name": "created_at",
+          "data_type": "DATETIME",
+          "description": "When LTV record was created"
+        },
+        {
+          "name": "updated_at",
+          "data_type": "DATETIME",
+          "description": "When LTV record was last updated"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "InventorySnapshot",
+      "columns": [
+        {
+          "name": "snapshot_date",
+          "data_type": "DATE",
+          "description": "Date of inventory snapshot"
+        },
+        {
+          "name": "product_id",
+          "data_type": "INT",
+          "description": "Product identifier"
+        },
+        {
+          "name": "product_name",
+          "data_type": "VARCHAR",
+          "description": "Product name"
+        },
+        {
+          "name": "category",
+          "data_type": "VARCHAR",
+          "description": "Product category"
+        },
+        {
+          "name": "warehouse_id",
+          "data_type": "INT",
+          "description": "Warehouse location"
+        },
+        {
+          "name": "quantity_on_hand",
+          "data_type": "INT",
+          "description": "Total units in stock"
+        },
+        {
+          "name": "quantity_reserved",
+          "data_type": "INT",
+          "description": "Units reserved for orders"
+        },
+        {
+          "name": "quantity_available",
+          "data_type": "INT",
+          "description": "Units available for sale"
+        },
+        {
+          "name": "reorder_point",
+          "data_type": "INT",
+          "description": "Minimum stock level threshold"
+        },
+        {
+          "name": "is_low_stock",
+          "data_type": "BIT",
+          "description": "Flag indicating if stock is below reorder point"
+        },
+        {
+          "name": "days_of_supply",
+          "data_type": "DECIMAL",
+          "description": "Estimated days until stock depletion based on sales velocity"
+        },
+        {
+          "name": "last_restock_date",
+          "data_type": "DATE",
+          "description": "Date of last inventory replenishment"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "AuditLog",
+      "columns": [
+        {
+          "name": "proc_name",
+          "data_type": "VARCHAR",
+          "description": "Name of stored procedure that executed"
+        },
+        {
+          "name": "status",
+          "data_type": "VARCHAR",
+          "description": "Execution status (SUCCESS, FAILED, COMPLETED)"
+        },
+        {
+          "name": "row_count",
+          "data_type": "INT",
+          "description": "Number of rows affected by the procedure"
+        },
+        {
+          "name": "exec_timestamp",
+          "data_type": "DATETIME",
+          "description": "When the procedure executed"
+        },
+        {
+          "name": "error_msg",
+          "data_type": "VARCHAR",
+          "description": "Error message if procedure failed"
+        },
+        {
+          "name": "detail",
+          "data_type": "VARCHAR",
+          "description": "Additional execution details"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "ShippingQueue",
+      "columns": [
+        {
+          "name": "order_id",
+          "data_type": "INT",
+          "description": "Order to be shipped"
+        },
+        {
+          "name": "customer_id",
+          "data_type": "INT",
+          "description": "Customer for the order"
+        },
+        {
+          "name": "shipping_method",
+          "data_type": "VARCHAR",
+          "description": "Requested shipping method"
+        },
+        {
+          "name": "region",
+          "data_type": "VARCHAR",
+          "description": "Shipping destination region"
+        },
+        {
+          "name": "grand_total",
+          "data_type": "DECIMAL",
+          "description": "Total order value"
+        },
+        {
+          "name": "customer_tier",
+          "data_type": "VARCHAR",
+          "description": "Customer tier (VIP, Premium, Standard)"
+        },
+        {
+          "name": "priority_score",
+          "data_type": "INT",
+          "description": "Calculated priority score for shipping order"
+        },
+        {
+          "name": "queue_status",
+          "data_type": "VARCHAR",
+          "description": "Current status in shipping queue"
+        },
+        {
+          "name": "queued_at",
+          "data_type": "DATETIME",
+          "description": "When order was added to shipping queue"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "RevenueByProduct",
+      "columns": [
+        {
+          "name": "report_start",
+          "data_type": "DATE",
+          "description": "Start date of reporting period"
+        },
+        {
+          "name": "report_end",
+          "data_type": "DATE",
+          "description": "End date of reporting period"
+        },
+        {
+          "name": "product_id",
+          "data_type": "INT",
+          "description": "Product identifier"
+        },
+        {
+          "name": "product_name",
+          "data_type": "VARCHAR",
+          "description": "Product name"
+        },
+        {
+          "name": "category",
+          "data_type": "VARCHAR",
+          "description": "Product category"
+        },
+        {
+          "name": "units_sold",
+          "data_type": "INT",
+          "description": "Total units sold in period"
+        },
+        {
+          "name": "gross_revenue",
+          "data_type": "DECIMAL",
+          "description": "Total revenue before costs"
+        },
+        {
+          "name": "cost_of_goods",
+          "data_type": "DECIMAL",
+          "description": "Total cost of goods sold"
+        },
+        {
+          "name": "gross_margin",
+          "data_type": "DECIMAL",
+          "description": "Gross profit (revenue minus cost of goods)"
+        },
+        {
+          "name": "margin_pct",
+          "data_type": "DECIMAL",
+          "description": "Gross margin as percentage of revenue"
+        },
+        {
+          "name": "avg_selling_price",
+          "data_type": "DECIMAL",
+          "description": "Average selling price per unit"
+        },
+        {
+          "name": "return_units",
+          "data_type": "INT",
+          "description": "Number of units returned"
+        },
+        {
+          "name": "net_revenue",
+          "data_type": "DECIMAL",
+          "description": "Revenue after returns and refunds"
+        },
+        {
+          "name": "rank_by_revenue",
+          "data_type": "INT",
+          "description": "Product ranking by total revenue"
+        },
+        {
+          "name": "rank_by_units",
+          "data_type": "INT",
+          "description": "Product ranking by units sold"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "MonthlyKPI",
+      "columns": [
+        {
+          "name": "kpi_month",
+          "data_type": "DATE",
+          "description": "Month for which KPIs are calculated"
+        },
+        {
+          "name": "total_revenue",
+          "data_type": "DECIMAL",
+          "description": "Total revenue for the month"
+        },
+        {
+          "name": "total_orders",
+          "data_type": "INT",
+          "description": "Total number of orders"
+        },
+        {
+          "name": "avg_order_value",
+          "data_type": "DECIMAL",
+          "description": "Average order value for the month"
+        },
+        {
+          "name": "new_customers",
+          "data_type": "INT",
+          "description": "Number of new customers acquired"
+        },
+        {
+          "name": "mom_growth_pct",
+          "data_type": "DECIMAL",
+          "description": "Month-over-month growth percentage"
+        },
+        {
+          "name": "active_customers",
+          "data_type": "INT",
+          "description": "Number of customers who placed orders"
+        },
+        {
+          "name": "returning_customers",
+          "data_type": "INT",
+          "description": "Number of customers with previous orders"
+        },
+        {
+          "name": "created_at",
+          "data_type": "DATETIME",
+          "description": "When KPI record was created"
+        },
+        {
+          "name": "updated_at",
+          "data_type": "DATETIME",
+          "description": "When KPI record was last updated"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "staging",
+      "table_name": "OrderStaging",
+      "columns": [
+        {
+          "name": "batch_id",
+          "data_type": "UNIQUEIDENTIFIER",
+          "description": "Batch identifier for processing group"
+        },
+        {
+          "name": "raw_order_id",
+          "data_type": "VARCHAR",
+          "description": "Original order ID from source system"
+        },
+        {
+          "name": "customer_email",
+          "data_type": "VARCHAR",
+          "description": "Cleaned customer email address"
+        },
+        {
+          "name": "product_sku",
+          "data_type": "VARCHAR",
+          "description": "Cleaned product SKU"
+        },
+        {
+          "name": "quantity",
+          "data_type": "INT",
+          "description": "Order quantity"
+        },
+        {
+          "name": "unit_price",
+          "data_type": "DECIMAL",
+          "description": "Unit price"
+        },
+        {
+          "name": "order_date_str",
+          "data_type": "VARCHAR",
+          "description": "Original date string from source"
+        },
+        {
+          "name": "order_date_parsed",
+          "data_type": "DATE",
+          "description": "Parsed and validated order date"
+        },
+        {
+          "name": "currency",
+          "data_type": "VARCHAR",
+          "description": "Currency code (defaulted to USD)"
+        },
+        {
+          "name": "channel",
+          "data_type": "VARCHAR",
+          "description": "Sales channel (defaulted to web)"
+        },
+        {
+          "name": "is_valid",
+          "data_type": "BIT",
+          "description": "Flag indicating if record passed validation"
+        },
+        {
+          "name": "validation_errors",
+          "data_type": "VARCHAR",
+          "description": "Concatenated validation error messages"
+        },
+        {
+          "name": "staged_at",
+          "data_type": "DATETIME",
+          "description": "When record was staged"
+        },
+        {
+          "name": "promoted",
+          "data_type": "BIT",
+          "description": "Flag indicating if record was promoted to production"
+        },
+        {
+          "name": "promoted_at",
+          "data_type": "DATETIME",
+          "description": "When record was promoted"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "dbo",
+      "table_name": "CustomerScorecard",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "INT",
+          "description": "Customer identifier"
+        },
+        {
+          "name": "customer_name",
+          "data_type": "VARCHAR",
+          "description": "Full customer name"
+        },
+        {
+          "name": "email",
+          "data_type": "VARCHAR",
+          "description": "Customer email address"
+        },
+        {
+          "name": "signup_date",
+          "data_type": "DATE",
+          "description": "Date customer signed up"
+        },
+        {
+          "name": "tenure_days",
+          "data_type": "INT",
+          "description": "Number of days since signup"
+        },
+        {
+          "name": "order_count",
+          "data_type": "INT",
+          "description": "Total number of orders"
+        },
+        {
+          "name": "total_spend",
+          "data_type": "DECIMAL",
+          "description": "Total amount spent"
+        },
+        {
+          "name": "avg_order",
+          "data_type": "DECIMAL",
+          "description": "Average order value"
+        },
+        {
+          "name": "last_order",
+          "data_type": "DATE",
+          "description": "Date of last order"
+        },
+        {
+          "name": "predicted_annual_value",
+          "data_type": "DECIMAL",
+          "description": "Predicted annual spending"
+        },
+        {
+          "name": "decile_rank",
+          "data_type": "INT",
+          "description": "Customer value decile ranking"
+        },
+        {
+          "name": "engagement_score",
+          "data_type": "INT",
+          "description": "Calculated engagement score (0-100)"
+        },
+        {
+          "name": "engagement_label",
+          "data_type": "VARCHAR",
+          "description": "Engagement category (Highly Engaged, Moderately Engaged, Low Engagement)"
+        },
+        {
+          "name": "scored_at",
+          "data_type": "DATETIME",
+          "description": "When scorecard was calculated"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "archive",
+      "table_name": "Orders",
+      "columns": [
+        {
+          "name": "order_id",
+          "data_type": "INT",
+          "description": "Archived order identifier"
+        },
+        {
+          "name": "customer_id",
+          "data_type": "INT",
+          "description": "Customer who placed the archived order"
+        },
+        {
+          "name": "order_date",
+          "data_type": "DATE",
+          "description": "Date archived order was placed"
+        },
+        {
+          "name": "status",
+          "data_type": "VARCHAR",
+          "description": "Final status of archived order"
+        },
+        {
+          "name": "archived_at",
+          "data_type": "DATETIME",
+          "description": "When order was archived"
+        }
+      ],
+      "table_type": "target"
+    }
+  ],
+  "components": [
+    {
+      "name": "usp_RefreshOrderSummary",
+      "component_type": "stored_procedure",
+      "description": "Rebuilds denormalized order summary by joining orders with customers, order items, tax rates, addresses, and shipping providers. Calculates item counts, subtotals, discounts, taxes, and grand totals. Filters out cancelled orders and processes date range (default last 90 days). Uses DELETE + INSERT pattern for data refresh.",
+      "input_tables": [
+        "dbo.Orders",
+        "dbo.Customers",
+        "dbo.OrderItems",
+        "dbo.TaxRates",
+        "dbo.CustomerAddresses",
+        "dbo.ShippingProviders"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "customer_name",
+        "customer_email",
+        "order_date",
+        "order_status",
+        "item_count",
+        "subtotal",
+        "discount_total",
+        "tax_total",
+        "shipping_total",
+        "grand_total",
+        "payment_method",
+        "shipping_method",
+        "estimated_delivery",
+        "region",
+        "etl_timestamp"
+      ],
+      "sql_text": "SELECT o.order_id, o.customer_id, c.first_name + ' ' + c.last_name AS customer_name, c.email AS customer_email, o.order_date, o.status AS order_status, COUNT(oi.item_id) AS item_count, SUM(oi.quantity * oi.unit_price) AS subtotal, SUM(oi.discount_amount) AS discount_total, SUM(oi.quantity * oi.unit_price * tr.tax_rate / 100) AS tax_total, o.shipping_cost AS shipping_total, SUM(oi.quantity * oi.unit_price) - SUM(oi.discount_amount) + SUM(oi.quantity * oi.unit_price * tr.tax_rate / 100) + o.shipping_cost AS grand_total, o.payment_method, o.shipping_method, DATEADD(DAY, sp.avg_delivery_days, o.order_date) AS estimated_delivery, ca.region, GETDATE() AS etl_timestamp FROM dbo.Orders o INNER JOIN dbo.Customers c ON o.customer_id = c.customer_id INNER JOIN dbo.OrderItems oi ON o.order_id = oi.order_id LEFT JOIN dbo.TaxRates tr ON c.state = tr.state LEFT JOIN dbo.CustomerAddresses ca ON c.customer_id = ca.customer_id AND ca.address_type = 'shipping' LEFT JOIN dbo.ShippingProviders sp ON o.shipping_method = sp.provider_name WHERE o.order_date BETWEEN @StartDate AND @EndDate AND o.status <> 'cancelled' GROUP BY o.order_id, o.customer_id, c.first_name, c.last_name, c.email, o.order_date, o.status, o.shipping_cost, o.payment_method, o.shipping_method, sp.avg_delivery_days, ca.region"
+    },
+    {
+      "name": "temp_table_DailyCalc",
+      "component_type": "temp_table",
+      "description": "Temporary table that aggregates daily revenue metrics by region and channel. Calculates order counts, total revenue, average order values, and counts new customers who signed up on the report date. Groups data by region (defaulting 'Unknown' for missing) and sales channel.",
+      "input_tables": [
+        "dbo.OrderSummary",
+        "dbo.Orders",
+        "dbo.Customers",
+        "dbo.CustomerAddresses"
+      ],
+      "output_columns": [
+        "report_date",
+        "region",
+        "channel",
+        "order_count",
+        "revenue",
+        "avg_order_value",
+        "new_customers"
+      ],
+      "sql_text": "SELECT @ReportDate AS report_date, COALESCE(ca.region, 'Unknown') AS region, o.channel, COUNT(DISTINCT o.order_id) AS order_count, SUM(os.grand_total) AS revenue, AVG(os.grand_total) AS avg_order_value, COUNT(DISTINCT CASE WHEN CAST(c.signup_date AS DATE) = @ReportDate THEN c.customer_id END) AS new_customers FROM dbo.OrderSummary os INNER JOIN dbo.Orders o ON os.order_id = o.order_id INNER JOIN dbo.Customers c ON os.customer_id = c.customer_id LEFT JOIN dbo.CustomerAddresses ca ON c.customer_id = ca.customer_id AND ca.address_type = 'billing' WHERE os.order_date = @ReportDate GROUP BY COALESCE(ca.region, 'Unknown'), o.channel"
+    },
+    {
+      "name": "usp_CalculateDailyRevenue",
+      "component_type": "stored_procedure",
+      "description": "Processes daily revenue aggregation using temporary table for intermediate calculations, then merges results into permanent DailyRevenue table. Updates existing records or inserts new ones based on report_date, region, and channel combination. Tracks order counts, revenue totals, average order values, and new customer acquisitions.",
+      "input_tables": [
+        "dbo.OrderSummary",
+        "dbo.Orders",
+        "dbo.Customers",
+        "dbo.CustomerAddresses"
+      ],
+      "output_columns": [
+        "report_date",
+        "region",
+        "channel",
+        "order_count",
+        "revenue",
+        "avg_order_value",
+        "new_customers",
+        "created_at",
+        "updated_at"
+      ],
+      "sql_text": "MERGE dbo.DailyRevenue AS tgt USING #DailyCalc AS src ON tgt.report_date = src.report_date AND tgt.region = src.region AND tgt.channel = src.channel WHEN MATCHED THEN UPDATE SET tgt.order_count = src.order_count, tgt.revenue = src.revenue, tgt.avg_order_value = src.avg_order_value, tgt.new_customers = src.new_customers, tgt.updated_at = GETDATE() WHEN NOT MATCHED THEN INSERT (report_date, region, channel, order_count, revenue, avg_order_value, new_customers, created_at) VALUES (src.report_date, src.region, src.channel, src.order_count, src.revenue, src.avg_order_value, src.new_customers, GETDATE())"
+    },
+    {
+      "name": "temp_table_LTV_Calc",
+      "component_type": "temp_table",
+      "description": "Temporary table that calculates comprehensive customer lifetime value metrics including total orders, total spend, average order value, months active, days dormant, predicted annual value based on historical patterns, and decile ranking using NTILE window function. Excludes cancelled orders from calculations.",
+      "input_tables": [
+        "dbo.Customers",
+        "dbo.Orders",
+        "dbo.OrderSummary"
+      ],
+      "output_columns": [
+        "customer_id",
+        "total_orders",
+        "total_spend",
+        "avg_order_value",
+        "months_active",
+        "last_order_date",
+        "days_dormant",
+        "predicted_annual_value",
+        "decile_rank"
+      ],
+      "sql_text": "SELECT c.customer_id, COUNT(DISTINCT o.order_id) AS total_orders, SUM(os.grand_total) AS total_spend, AVG(os.grand_total) AS avg_order_value, DATEDIFF(MONTH, MIN(o.order_date), MAX(o.order_date)) AS months_active, MAX(o.order_date) AS last_order_date, DATEDIFF(DAY, MAX(o.order_date), GETDATE()) AS days_dormant, CASE WHEN DATEDIFF(MONTH, MIN(o.order_date), MAX(o.order_date)) = 0 THEN SUM(os.grand_total) * 12 ELSE SUM(os.grand_total) / DATEDIFF(MONTH, MIN(o.order_date), MAX(o.order_date)) * 12 END AS predicted_annual_value, NTILE(10) OVER (ORDER BY SUM(os.grand_total) DESC) AS decile_rank FROM dbo.Customers c INNER JOIN dbo.Orders o ON c.customer_id = o.customer_id INNER JOIN dbo.OrderSummary os ON o.order_id = os.order_id WHERE o.status <> 'cancelled' GROUP BY c.customer_id"
+    },
+    {
+      "name": "usp_UpdateCustomerLTV",
+      "component_type": "stored_procedure",
+      "description": "Updates customer lifetime value metrics by calculating order history, spending patterns, activity periods, and predictive annual values. Uses temporary table for complex calculations including months active, dormancy periods, and decile rankings. Merges results into permanent CustomerLifetimeValue table.",
+      "input_tables": [
+        "dbo.Customers",
+        "dbo.Orders",
+        "dbo.OrderSummary"
+      ],
+      "output_columns": [
+        "customer_id",
+        "total_orders",
+        "total_spend",
+        "avg_order_value",
+        "months_active",
+        "last_order_date",
+        "days_dormant",
+        "predicted_annual_value",
+        "decile_rank",
+        "created_at",
+        "updated_at"
+      ],
+      "sql_text": "MERGE dbo.CustomerLifetimeValue AS tgt USING #LTV_Calc AS src ON tgt.customer_id = src.customer_id WHEN MATCHED THEN UPDATE SET tgt.total_orders = src.total_orders, tgt.total_spend = src.total_spend, tgt.avg_order_value = src.avg_order_value, tgt.months_active = src.months_active, tgt.last_order_date = src.last_order_date, tgt.days_dormant = src.days_dormant, tgt.predicted_annual_value = src.predicted_annual_value, tgt.decile_rank = src.decile_rank, tgt.updated_at = GETDATE() WHEN NOT MATCHED THEN INSERT (customer_id, total_orders, total_spend, avg_order_value, months_active, last_order_date, days_dormant, predicted_annual_value, decile_rank, created_at) VALUES (src.customer_id, src.total_orders, src.total_spend, src.avg_order_value, src.months_active, src.last_order_date, src.days_dormant, src.predicted_annual_value, src.decile_rank, GETDATE())"
+    },
+    {
+      "name": "subquery_sales_30d",
+      "component_type": "subquery",
+      "description": "Calculates 30-day trailing sales velocity by product to estimate daily average sales. Used for inventory days-of-supply calculations. Excludes cancelled and returned orders from velocity calculations.",
+      "input_tables": [
+        "dbo.OrderItems",
+        "dbo.Orders"
+      ],
+      "output_columns": [
+        "product_id",
+        "daily_avg"
+      ],
+      "sql_text": "SELECT oi.product_id, SUM(oi.quantity) / 30.0 AS daily_avg FROM dbo.OrderItems oi INNER JOIN dbo.Orders o ON oi.order_id = o.order_id WHERE o.order_date >= DATEADD(DAY, -30, @SnapshotDate) AND o.status NOT IN ('cancelled', 'returned') GROUP BY oi.product_id"
+    },
+    {
+      "name": "usp_SnapshotInventory",
+      "component_type": "stored_procedure",
+      "description": "Creates nightly inventory snapshots with low-stock flagging and days-of-supply calculations. Joins inventory data with products and 30-day sales velocity to calculate available quantities, reorder point comparisons, and estimated days until stock depletion based on historical sales patterns.",
+      "input_tables": [
+        "dbo.Inventory",
+        "dbo.Products",
+        "dbo.OrderItems",
+        "dbo.Orders"
+      ],
+      "output_columns": [
+        "snapshot_date",
+        "product_id",
+        "product_name",
+        "category",
+        "warehouse_id",
+        "quantity_on_hand",
+        "quantity_reserved",
+        "quantity_available",
+        "reorder_point",
+        "is_low_stock",
+        "days_of_supply",
+        "last_restock_date"
+      ],
+      "sql_text": "SELECT @SnapshotDate, p.product_id, p.product_name, p.category, i.warehouse_id, i.quantity_on_hand, i.quantity_reserved, i.quantity_on_hand - i.quantity_reserved AS quantity_available, i.reorder_point, CASE WHEN (i.quantity_on_hand - i.quantity_reserved) <= i.reorder_point THEN 1 ELSE 0 END AS is_low_stock, CASE WHEN COALESCE(sales_30d.daily_avg, 0) = 0 THEN 9999 ELSE (i.quantity_on_hand - i.quantity_reserved) / sales_30d.daily_avg END AS days_of_supply, i.last_restock_date FROM dbo.Inventory i INNER JOIN dbo.Products p ON i.product_id = p.product_id LEFT JOIN (subquery_sales_30d) sales_30d ON p.product_id = sales_30d.product_id"
+    },
+    {
+      "name": "table_variable_PendingOrders",
+      "component_type": "temp_table",
+      "description": "Table variable that identifies pending orders and calculates priority scores based on customer tier (from LTV decile ranking), shipping method urgency, and order age. Assigns higher priority to VIP customers (decile 1-2), express shipping, and older orders. Excludes orders already in shipping queue.",
+      "input_tables": [
+        "dbo.OrderSummary",
+        "dbo.CustomerLifetimeValue"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "shipping_method",
+        "region",
+        "grand_total",
+        "customer_tier",
+        "priority_score"
+      ],
+      "sql_text": "SELECT os.order_id, os.customer_id, os.order_date, os.shipping_method, os.region, os.grand_total, COALESCE(ltv.decile_rank_label, 'Standard') AS customer_tier, CASE WHEN ltv.decile_rank <= 2 THEN 30 WHEN ltv.decile_rank <= 5 THEN 20 ELSE 10 END + CASE WHEN os.shipping_method = 'express' THEN 20 WHEN os.shipping_method = 'priority' THEN 10 ELSE 0 END + DATEDIFF(DAY, os.order_date, GETDATE()) * 5 AS priority_score FROM dbo.OrderSummary os LEFT JOIN (SELECT customer_id, decile_rank, CASE WHEN decile_rank <= 2 THEN 'VIP' WHEN decile_rank <= 5 THEN 'Premium' ELSE 'Standard' END AS decile_rank_label FROM dbo.CustomerLifetimeValue) ltv ON os.customer_id = ltv.customer_id WHERE os.order_status = 'confirmed' AND NOT EXISTS (SELECT 1 FROM dbo.ShippingQueue sq WHERE sq.order_id = os.order_id)"
+    },
+    {
+      "name": "usp_ProcessShippingQueue",
+      "component_type": "stored_procedure",
+      "description": "Processes confirmed orders into shipping queue with intelligent priority scoring. Combines customer value tier (VIP/Premium/Standard based on LTV decile), shipping method urgency (express/priority/standard), and order age to calculate priority scores. Inserts orders into shipping queue ordered by priority for fulfillment optimization.",
+      "input_tables": [
+        "dbo.OrderSummary",
+        "dbo.CustomerLifetimeValue",
+        "dbo.ShippingQueue"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "shipping_method",
+        "region",
+        "grand_total",
+        "customer_tier",
+        "priority_score",
+        "queue_status",
+        "queued_at"
+      ],
+      "sql_text": "INSERT INTO dbo.ShippingQueue (order_id, customer_id, shipping_method, region, grand_total, customer_tier, priority_score, queue_status, queued_at) SELECT order_id, customer_id, shipping_method, region, grand_total, customer_tier, priority_score, 'pending', GETDATE() FROM @PendingOrders ORDER BY priority_score DESC"
+    },
+    {
+      "name": "subquery_returns",
+      "component_type": "subquery",
+      "description": "Calculates return metrics by product for the reporting period, including total return units and refund amounts. Filters for orders with 'returned' status within the specified date range to provide net revenue calculations.",
+      "input_tables": [
+        "dbo.OrderItems",
+        "dbo.Orders"
+      ],
+      "output_columns": [
+        "product_id",
+        "return_units",
+        "refund_total"
+      ],
+      "sql_text": "SELECT oi2.product_id, SUM(oi2.quantity) AS return_units, SUM(oi2.return_amount) AS refund_total FROM dbo.OrderItems oi2 INNER JOIN dbo.Orders o2 ON oi2.order_id = o2.order_id WHERE o2.status = 'returned' AND o2.order_date BETWEEN @StartDate AND @EndDate GROUP BY oi2.product_id"
+    },
+    {
+      "name": "usp_RevenueByProduct",
+      "component_type": "stored_procedure",
+      "description": "Generates comprehensive product-level revenue analysis including units sold, gross revenue, cost of goods, gross margins, margin percentages, average selling prices, return impacts, and product rankings. Calculates net revenue after returns and provides both revenue-based and unit-based rankings using window functions.",
+      "input_tables": [
+        "dbo.OrderItems",
+        "dbo.Orders",
+        "dbo.Products"
+      ],
+      "output_columns": [
+        "report_start",
+        "report_end",
+        "product_id",
+        "product_name",
+        "category",
+        "units_sold",
+        "gross_revenue",
+        "cost_of_goods",
+        "gross_margin",
+        "margin_pct",
+        "avg_selling_price",
+        "return_units",
+        "net_revenue",
+        "rank_by_revenue",
+        "rank_by_units"
+      ],
+      "sql_text": "SELECT @StartDate, @EndDate, p.product_id, p.product_name, p.category, SUM(oi.quantity) AS units_sold, SUM(oi.quantity * oi.unit_price) AS gross_revenue, SUM(oi.quantity * p.cost_price) AS cost_of_goods, SUM(oi.quantity * oi.unit_price) - SUM(oi.quantity * p.cost_price) AS gross_margin, CASE WHEN SUM(oi.quantity * oi.unit_price) = 0 THEN 0 ELSE (SUM(oi.quantity * oi.unit_price) - SUM(oi.quantity * p.cost_price)) / SUM(oi.quantity * oi.unit_price) * 100 END AS margin_pct, AVG(oi.unit_price) AS avg_selling_price, COALESCE(ret.return_units, 0) AS return_units, SUM(oi.quantity * oi.unit_price) - COALESCE(ret.refund_total, 0) AS net_revenue, RANK() OVER (ORDER BY SUM(oi.quantity * oi.unit_price) DESC) AS rank_by_revenue, RANK() OVER (ORDER BY SUM(oi.quantity) DESC) AS rank_by_units FROM dbo.OrderItems oi INNER JOIN dbo.Orders o ON oi.order_id = o.order_id INNER JOIN dbo.Products p ON oi.product_id = p.product_id LEFT JOIN (subquery_returns) ret ON p.product_id = ret.product_id WHERE o.order_date BETWEEN @StartDate AND @EndDate AND o.status NOT IN ('cancelled') GROUP BY p.product_id, p.product_name, p.category, ret.return_units, ret.refund_total"
+    },
+    {
+      "name": "temp_table_KPI_Current",
+      "component_type": "temp_table",
+      "description": "Temporary table that aggregates monthly KPI metrics including total revenue, order counts, average order values, new customer acquisitions, month-over-month growth calculations, active customer counts, and returning customer analysis. Compares current month performance against previous month for growth percentage calculations.",
+      "input_tables": [
+        "dbo.DailyRevenue",
+        "dbo.Orders"
+      ],
+      "output_columns": [
+        "kpi_month",
+        "total_revenue",
+        "total_orders",
+        "avg_order_value",
+        "new_customers",
+        "prev_month_revenue",
+        "mom_growth_pct",
+        "active_customers",
+        "returning_customers"
+      ],
+      "sql_text": "SELECT @MonthStart AS kpi_month, SUM(dr.revenue) AS total_revenue, SUM(dr.order_count) AS total_orders, SUM(dr.revenue) / NULLIF(SUM(dr.order_count), 0) AS avg_order_value, SUM(dr.new_customers) AS new_customers, prev.prev_month_revenue, CASE WHEN prev.prev_month_revenue = 0 THEN NULL ELSE (SUM(dr.revenue) - prev.prev_month_revenue) / prev.prev_month_revenue * 100 END AS mom_growth_pct, (SELECT COUNT(DISTINCT customer_id) FROM dbo.Orders WHERE order_date BETWEEN @MonthStart AND @MonthEnd AND status <> 'cancelled') AS active_customers, (SELECT COUNT(DISTINCT o1.customer_id) FROM dbo.Orders o1 WHERE o1.order_date BETWEEN @MonthStart AND @MonthEnd AND EXISTS (SELECT 1 FROM dbo.Orders o2 WHERE o2.customer_id = o1.customer_id AND o2.order_date < @MonthStart)) AS returning_customers FROM dbo.DailyRevenue dr CROSS JOIN (SELECT SUM(revenue) AS prev_month_revenue FROM dbo.DailyRevenue WHERE report_date BETWEEN @PrevMonthStart AND @PrevMonthEnd) prev WHERE dr.report_date BETWEEN @MonthStart AND @MonthEnd"
+    },
+    {
+      "name": "usp_MonthlyKPIDashboard",
+      "component_type": "stored_procedure",
+      "description": "Generates executive dashboard KPIs for specified month including revenue totals, order metrics, customer acquisition and retention analysis, and month-over-month growth calculations. Uses complex subqueries to identify active and returning customers, then merges results into permanent MonthlyKPI table.",
+      "input_tables": [
+        "dbo.DailyRevenue",
+        "dbo.Orders"
+      ],
+      "output_columns": [
+        "kpi_month",
+        "total_revenue",
+        "total_orders",
+        "avg_order_value",
+        "new_customers",
+        "mom_growth_pct",
+        "active_customers",
+        "returning_customers",
+        "created_at",
+        "updated_at"
+      ],
+      "sql_text": "MERGE dbo.MonthlyKPI AS tgt USING #KPI_Current AS src ON tgt.kpi_month = src.kpi_month WHEN MATCHED THEN UPDATE SET tgt.total_revenue = src.total_revenue, tgt.total_orders = src.total_orders, tgt.avg_order_value = src.avg_order_value, tgt.new_customers = src.new_customers, tgt.mom_growth_pct = src.mom_growth_pct, tgt.active_customers = src.active_customers, tgt.returning_customers = src.returning_customers, tgt.updated_at = GETDATE() WHEN NOT MATCHED THEN INSERT (kpi_month, total_revenue, total_orders, avg_order_value, new_customers, mom_growth_pct, active_customers, returning_customers, created_at) VALUES (src.kpi_month, src.total_revenue, src.total_orders, src.avg_order_value, src.new_customers, src.mom_growth_pct, src.active_customers, src.returning_customers, GETDATE())"
+    },
+    {
+      "name": "usp_StageIncomingOrders",
+      "component_type": "stored_procedure",
+      "description": "Loads and validates raw order data into staging with comprehensive data cleansing and validation. Performs email trimming and lowercasing, SKU uppercasing, date parsing, currency and channel defaulting. Validates data quality including date formats, positive quantities and prices, required fields. Concatenates validation errors and flags invalid records.",
+      "input_tables": [
+        "staging.RawOrderFeed"
+      ],
+      "output_columns": [
+        "batch_id",
+        "raw_order_id",
+        "customer_email",
+        "product_sku",
+        "quantity",
+        "unit_price",
+        "order_date_str",
+        "order_date_parsed",
+        "currency",
+        "channel",
+        "is_valid",
+        "validation_errors",
+        "staged_at"
+      ],
+      "sql_text": "INSERT INTO staging.OrderStaging (batch_id, raw_order_id, customer_email, product_sku, quantity, unit_price, order_date_str, order_date_parsed, currency, channel, is_valid, validation_errors, staged_at) SELECT @BatchId, ro.raw_id, LOWER(TRIM(ro.email)), UPPER(TRIM(ro.sku)), ro.qty, ro.price, ro.order_date_text, TRY_CAST(ro.order_date_text AS DATE), UPPER(COALESCE(ro.currency, 'USD')), LOWER(COALESCE(ro.channel, 'web')), CASE WHEN TRY_CAST(ro.order_date_text AS DATE) IS NULL THEN 0 WHEN ro.qty <= 0 THEN 0 WHEN ro.price < 0 THEN 0 WHEN ro.email IS NULL OR ro.email = '' THEN 0 WHEN ro.sku IS NULL OR ro.sku = '' THEN 0 ELSE 1 END, CONCAT_WS('; ', CASE WHEN TRY_CAST(ro.order_date_text AS DATE) IS NULL THEN 'Invalid date: ' + COALESCE(ro.order_date_text, 'NULL') END, CASE WHEN ro.qty <= 0 THEN 'Invalid quantity' END, CASE WHEN ro.price < 0 THEN 'Negative price' END, CASE WHEN ro.email IS NULL OR ro.email = '' THEN 'Missing email' END, CASE WHEN ro.sku IS NULL OR ro.sku = '' THEN 'Missing SKU' END), GETDATE() FROM staging.RawOrderFeed ro WHERE ro.processed = 0"
+    },
+    {
+      "name": "usp_PromoteStaging",
+      "component_type": "stored_procedure",
+      "description": "Promotes validated staging records into production tables by inserting new orders and order items. Matches customers by email, products by SKU, and applies promotional discounts where applicable. Uses transaction management to ensure data consistency during the promotion process from staging to production.",
+      "input_tables": [
+        "staging.OrderStaging",
+        "dbo.Customers",
+        "dbo.Products",
+        "dbo.Promotions"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "status",
+        "channel",
+        "payment_method",
+        "shipping_method",
+        "shipping_cost",
+        "created_at"
+      ],
+      "sql_text": "INSERT INTO dbo.Orders (customer_id, order_date, status, channel, payment_method, shipping_method, shipping_cost, created_at) SELECT c.customer_id, s.order_date_parsed, 'pending', s.channel, 'credit_card', 'standard', 0.00, GETDATE() FROM staging.OrderStaging s INNER JOIN dbo.Customers c ON s.customer_email = c.email WHERE s.batch_id = @BatchId AND s.is_valid = 1 AND NOT EXISTS (SELECT 1 FROM dbo.Orders o WHERE o.external_ref = s.raw_order_id)"
+    },
+    {
+      "name": "cte_CustomerBase",
+      "component_type": "CTE",
+      "description": "Base CTE that retrieves active customer information including full name concatenation and tenure calculation in days since signup. Filters for active customers and optionally for specific customer ID when provided as parameter.",
+      "input_tables": [
+        "dbo.Customers"
+      ],
+      "output_columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "signup_date",
+        "tenure_days"
+      ],
+      "sql_text": "SELECT c.customer_id, c.first_name + ' ' + c.last_name AS customer_name, c.email, c.signup_date, DATEDIFF(DAY, c.signup_date, GETDATE()) AS tenure_days FROM dbo.Customers c WHERE (@CustomerId IS NULL OR c.customer_id = @CustomerId) AND c.status = 'active'"
+    },
+    {
+      "name": "cte_OrderMetrics",
+      "component_type": "CTE",
+      "description": "CTE that calculates order-level metrics for each customer including total order count, total spend, average order value, and last order date. Excludes cancelled and returned orders from calculations to provide accurate customer value metrics.",
+      "input_tables": [
+        "dbo.Orders",
+        "dbo.OrderSummary"
+      ],
+      "output_columns": [
+        "customer_id",
+        "order_count",
+        "total_spend",
+        "avg_order",
+        "last_order"
+      ],
+      "sql_text": "SELECT cb.customer_id, COUNT(DISTINCT o.order_id) AS order_count, SUM(os.grand_total) AS total_spend, AVG(os.grand_total) AS avg_order, MAX(o.order_date) AS last_order FROM CustomerBase cb LEFT JOIN dbo.Orders o ON cb.customer_id = o.customer_id LEFT JOIN dbo.OrderSummary os ON o.order_id = os.order_id WHERE o.status NOT IN ('cancelled', 'returned') GROUP BY cb.customer_id"
+    },
+    {
+      "name": "cte_EngagementScore",
+      "component_type": "CTE",
+      "description": "CTE that calculates customer engagement scores (0-100) based on recency (last order within 30/90/180 days), frequency (order count tiers), and customer value (LTV decile ranking). Combines multiple engagement factors with weighted scoring to produce overall engagement assessment.",
+      "input_tables": [
+        "dbo.CustomerLifetimeValue"
+      ],
+      "output_columns": [
+        "customer_id",
+        "engagement_score"
+      ],
+      "sql_text": "SELECT cb.customer_id, LEAST(100, (CASE WHEN om.last_order IS NULL THEN 0 WHEN DATEDIFF(DAY, om.last_order, GETDATE()) <= 30 THEN 40 WHEN DATEDIFF(DAY, om.last_order, GETDATE()) <= 90 THEN 25 WHEN DATEDIFF(DAY, om.last_order, GETDATE()) <= 180 THEN 10 ELSE 0 END) + (CASE WHEN om.order_count >= 20 THEN 30 WHEN om.order_count >= 10 THEN 20 WHEN om.order_count >= 3 THEN 10 ELSE 5 END) + (CASE WHEN ltv.decile_rank <= 2 THEN 30 WHEN ltv.decile_rank <= 5 THEN 20 ELSE 10 END)) AS engagement_score FROM CustomerBase cb LEFT JOIN OrderMetrics om ON cb.customer_id = om.customer_id LEFT JOIN dbo.CustomerLifetimeValue ltv ON cb.customer_id = ltv.customer_id"
+    },
+    {
+      "name": "usp_GenerateCustomerScorecard",
+      "component_type": "stored_procedure",
+      "description": "Generates comprehensive customer scorecards combining customer demographics, order history, lifetime value predictions, and engagement scoring. Uses multiple CTEs to build layered customer analytics including tenure, spending patterns, predicted annual value, and engagement labels (Highly Engaged, Moderately Engaged, Low Engagement) based on calculated scores.",
+      "input_tables": [
+        "dbo.Customers",
+        "dbo.Orders",
+        "dbo.OrderSummary",
+        "dbo.CustomerLifetimeValue"
+      ],
+      "output_columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "signup_date",
+        "tenure_days",
+        "order_count",
+        "total_spend",
+        "avg_order",
+        "last_order",
+        "predicted_annual_value",
+        "decile_rank",
+        "engagement_score",
+        "engagement_label",
+        "scored_at"
+      ],
+      "sql_text": "MERGE dbo.CustomerScorecard AS tgt USING (SELECT cb.customer_id, cb.customer_name, cb.email, cb.signup_date, cb.tenure_days, COALESCE(om.order_count, 0) AS order_count, COALESCE(om.total_spend, 0) AS total_spend, COALESCE(om.avg_order, 0) AS avg_order, om.last_order, COALESCE(ltv.predicted_annual_value, 0) AS predicted_annual_value, ltv.decile_rank, es.engagement_score, CASE WHEN es.engagement_score >= 70 THEN 'Highly Engaged' WHEN es.engagement_score >= 40 THEN 'Moderately Engaged' ELSE 'Low Engagement' END AS engagement_label, GETDATE() AS scored_at FROM CustomerBase cb LEFT JOIN OrderMetrics om ON cb.customer_id = om.customer_id LEFT JOIN dbo.CustomerLifetimeValue ltv ON cb.customer_id = ltv.customer_id LEFT JOIN EngagementScore es ON cb.customer_id = es.customer_id) AS src ON tgt.customer_id = src.customer_id"
+    },
+    {
+      "name": "usp_NightlyETLOrchestrator",
+      "component_type": "stored_procedure",
+      "description": "Master orchestrator procedure that executes the complete nightly ETL pipeline in sequence. Calls 8 sub-procedures including order summary refresh, daily revenue calculation, customer LTV updates, inventory snapshots, shipping queue processing, product revenue analysis, monthly KPI generation, and customer scorecard updates. Provides centralized execution control for the entire pipeline.",
+      "input_tables": [],
+      "output_columns": [],
+      "sql_text": "EXEC dbo.usp_RefreshOrderSummary @StartDate = @Today, @EndDate = @Today; EXEC dbo.usp_CalculateDailyRevenue @ReportDate = @Today; EXEC dbo.usp_UpdateCustomerLTV; EXEC dbo.usp_SnapshotInventory @SnapshotDate = @Today; EXEC dbo.usp_ProcessShippingQueue; EXEC dbo.usp_RevenueByProduct @StartDate = DATEFROMPARTS(@Year, @Month, 1), @EndDate = @Today; EXEC dbo.usp_MonthlyKPIDashboard @Month = @Month, @Year = @Year; EXEC dbo.usp_GenerateCustomerScorecard @CustomerId = NULL"
+    },
+    {
+      "name": "usp_CleanupOldData",
+      "component_type": "stored_procedure",
+      "description": "Archives and purges old records based on configurable retention periods. Archives completed orders (delivered, returned, cancelled) older than retention threshold to archive schema, then deletes them from production. Also cleans up old audit logs (1 year retention) and inventory snapshots (6 months retention) to manage database size and performance.",
+      "input_tables": [
+        "dbo.Orders",
+        "dbo.OrderItems",
+        "dbo.AuditLog",
+        "dbo.InventorySnapshot"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "status",
+        "archived_at"
+      ],
+      "sql_text": "INSERT INTO archive.Orders SELECT *, GETDATE() AS archived_at FROM dbo.Orders WHERE order_date < @CutoffDate AND status IN ('delivered', 'returned', 'cancelled'); DELETE oi FROM dbo.OrderItems oi INNER JOIN dbo.Orders o ON oi.order_id = o.order_id WHERE o.order_date < @CutoffDate AND o.status IN ('delivered', 'returned', 'cancelled'); DELETE FROM dbo.Orders WHERE order_date < @CutoffDate AND status IN ('delivered', 'returned', 'cancelled')"
+    }
+  ],
+  "column_lineage": [
+    {
+      "target_table": "dbo.OrderSummary",
+      "target_column": "order_id",
+      "source_columns": [
+        "dbo.Orders.order_id"
+      ],
+      "transformation": "o.order_id",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [],
+      "notes": "Direct copy of order identifier from source orders table"
+    },
+    {
+      "target_table": "dbo.OrderSummary",
+      "target_column": "customer_name",
+      "source_columns": [
+        "dbo.Customers.first_name",
+        "dbo.Customers.last_name"
+      ],
+      "transformation": "c.first_name + ' ' + c.last_name",
+      "transformation_type": "concatenation",
+      "intermediate_steps": [],
+      "notes": "Concatenates customer first and last name with space separator for display"
+    },
+    {
+      "target_table": "dbo.OrderSummary",
+      "target_column": "item_count",
+      "source_columns": [
+        "dbo.OrderItems.item_id"
+      ],
+      "transformation": "COUNT(oi.item_id)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [],
+      "notes": "Counts total number of line items in each order"
+    },
+    {
+      "target_table": "dbo.OrderSummary",
+      "target_column": "subtotal",
+      "source_columns": [
+        "dbo.OrderItems.quantity",
+        "dbo.OrderItems.unit_price"
+      ],
+      "transformation": "SUM(oi.quantity * oi.unit_price)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [],
+      "notes": "Calculates order subtotal by summing quantity times unit price for all line items"
+    },
+    {
+      "target_table": "dbo.OrderSummary",
+      "target_column": "tax_total",
+      "source_columns": [
+        "dbo.OrderItems.quantity",
+        "dbo.OrderItems.unit_price",
+        "dbo.TaxRates.tax_rate"
+      ],
+      "transformation": "SUM(oi.quantity * oi.unit_price * tr.tax_rate / 100)",
+      "transformation_type": "calculation",
+      "intermediate_steps": [],
+      "notes": "Calculates total tax by applying state tax rate to line item amounts"
+    },
+    {
+      "target_table": "dbo.OrderSummary",
+      "target_column": "grand_total",
+      "source_columns": [
+        "dbo.OrderItems.quantity",
+        "dbo.OrderItems.unit_price",
+        "dbo.OrderItems.discount_amount",
+        "dbo.TaxRates.tax_rate",
+        "dbo.Orders.shipping_cost"
+      ],
+      "transformation": "SUM(oi.quantity * oi.unit_price) - SUM(oi.discount_amount) + SUM(oi.quantity * oi.unit_price * tr.tax_rate / 100) + o.shipping_cost",
+      "transformation_type": "calculation",
+      "intermediate_steps": [],
+      "notes": "Calculates final order total: subtotal minus discounts plus tax plus shipping"
+    },
+    {
+      "target_table": "dbo.OrderSummary",
+      "target_column": "estimated_delivery",
+      "source_columns": [
+        "dbo.Orders.order_date",
+        "dbo.ShippingProviders.avg_delivery_days"
+      ],
+      "transformation": "DATEADD(DAY, sp.avg_delivery_days, o.order_date)",
+      "transformation_type": "date_manipulation",
+      "intermediate_steps": [],
+      "notes": "Estimates delivery date by adding provider's average delivery days to order date"
+    },
+    {
+      "target_table": "dbo.DailyRevenue",
+      "target_column": "region",
+      "source_columns": [
+        "dbo.CustomerAddresses.region"
+      ],
+      "transformation": "COALESCE(ca.region, 'Unknown')",
+      "transformation_type": "coalesce",
+      "intermediate_steps": [
+        {
+          "component_name": "temp_table_DailyCalc",
+          "expression": "COALESCE(ca.region, 'Unknown')",
+          "output_column": "region"
+        }
+      ],
+      "notes": "Uses customer billing address region, defaults to 'Unknown' if missing"
+    },
+    {
+      "target_table": "dbo.DailyRevenue",
+      "target_column": "new_customers",
+      "source_columns": [
+        "dbo.Customers.signup_date",
+        "dbo.Customers.customer_id"
+      ],
+      "transformation": "COUNT(DISTINCT CASE WHEN CAST(c.signup_date AS DATE) = @ReportDate THEN c.customer_id END)",
+      "transformation_type": "conditional",
+      "intermediate_steps": [
+        {
+          "component_name": "temp_table_DailyCalc",
+          "expression": "COUNT(DISTINCT CASE WHEN CAST(c.signup_date AS DATE) = @ReportDate THEN c.customer_id END)",
+          "output_column": "new_customers"
+        }
+      ],
+      "notes": "Counts customers who signed up on the specific report date"
+    },
+    {
+      "target_table": "dbo.CustomerLifetimeValue",
+      "target_column": "predicted_annual_value",
+      "source_columns": [
+        "dbo.OrderSummary.grand_total",
+        "dbo.Orders.order_date"
+      ],
+      "transformation": "CASE WHEN DATEDIFF(MONTH, MIN(o.order_date), MAX(o.order_date)) = 0 THEN SUM(os.grand_total) * 12 ELSE SUM(os.grand_total) / DATEDIFF(MONTH, MIN(o.order_date), MAX(o.order_date)) * 12 END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "temp_table_LTV_Calc",
+          "expression": "CASE WHEN DATEDIFF(MONTH, MIN(o.order_date), MAX(o.order_date)) = 0 THEN SUM(os.grand_total) * 12 ELSE SUM(os.grand_total) / DATEDIFF(MONTH, MIN(o.order_date), MAX(o.order_date)) * 12 END",
+          "output_column": "predicted_annual_value"
+        }
+      ],
+      "notes": "Predicts annual spending: if single month activity, multiply by 12; otherwise annualize based on months active"
+    },
+    {
+      "target_table": "dbo.CustomerLifetimeValue",
+      "target_column": "decile_rank",
+      "source_columns": [
+        "dbo.OrderSummary.grand_total"
+      ],
+      "transformation": "NTILE(10) OVER (ORDER BY SUM(os.grand_total) DESC)",
+      "transformation_type": "window_function",
+      "intermediate_steps": [
+        {
+          "component_name": "temp_table_LTV_Calc",
+          "expression": "NTILE(10) OVER (ORDER BY SUM(os.grand_total) DESC)",
+          "output_column": "decile_rank"
+        }
+      ],
+      "notes": "Ranks customers into 10 deciles by total spend (1=top 10%, 10=bottom 10%)"
+    },
+    {
+      "target_table": "dbo.InventorySnapshot",
+      "target_column": "quantity_available",
+      "source_columns": [
+        "dbo.Inventory.quantity_on_hand",
+        "dbo.Inventory.quantity_reserved"
+      ],
+      "transformation": "i.quantity_on_hand - i.quantity_reserved",
+      "transformation_type": "calculation",
+      "intermediate_steps": [],
+      "notes": "Calculates available inventory by subtracting reserved quantities from on-hand stock"
+    },
+    {
+      "target_table": "dbo.InventorySnapshot",
+      "target_column": "is_low_stock",
+      "source_columns": [
+        "dbo.Inventory.quantity_on_hand",
+        "dbo.Inventory.quantity_reserved",
+        "dbo.Inventory.reorder_point"
+      ],
+      "transformation": "CASE WHEN (i.quantity_on_hand - i.quantity_reserved) <= i.reorder_point THEN 1 ELSE 0 END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [],
+      "notes": "Flags products as low stock when available quantity falls at or below reorder point"
+    },
+    {
+      "target_table": "dbo.InventorySnapshot",
+      "target_column": "days_of_supply",
+      "source_columns": [
+        "dbo.Inventory.quantity_on_hand",
+        "dbo.Inventory.quantity_reserved",
+        "dbo.OrderItems.quantity"
+      ],
+      "transformation": "CASE WHEN COALESCE(sales_30d.daily_avg, 0) = 0 THEN 9999 ELSE (i.quantity_on_hand - i.quantity_reserved) / sales_30d.daily_avg END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "subquery_sales_30d",
+          "expression": "SUM(oi.quantity) / 30.0",
+          "output_column": "daily_avg"
+        }
+      ],
+      "notes": "Estimates days until stock depletion based on 30-day sales velocity; returns 9999 for zero sales"
+    },
+    {
+      "target_table": "dbo.ShippingQueue",
+      "target_column": "customer_tier",
+      "source_columns": [
+        "dbo.CustomerLifetimeValue.decile_rank"
+      ],
+      "transformation": "CASE WHEN ltv.decile_rank <= 2 THEN 'VIP' WHEN ltv.decile_rank <= 5 THEN 'Premium' ELSE 'Standard' END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "table_variable_PendingOrders",
+          "expression": "CASE WHEN ltv.decile_rank <= 2 THEN 'VIP' WHEN ltv.decile_rank <= 5 THEN 'Premium' ELSE 'Standard' END",
+          "output_column": "customer_tier"
+        }
+      ],
+      "notes": "Assigns customer tier based on LTV decile: top 20% = VIP, next 30% = Premium, rest = Standard"
+    },
+    {
+      "target_table": "dbo.ShippingQueue",
+      "target_column": "priority_score",
+      "source_columns": [
+        "dbo.CustomerLifetimeValue.decile_rank",
+        "dbo.OrderSummary.shipping_method",
+        "dbo.OrderSummary.order_date"
+      ],
+      "transformation": "CASE WHEN ltv.decile_rank <= 2 THEN 30 WHEN ltv.decile_rank <= 5 THEN 20 ELSE 10 END + CASE WHEN os.shipping_method = 'express' THEN 20 WHEN os.shipping_method = 'priority' THEN 10 ELSE 0 END + DATEDIFF(DAY, os.order_date, GETDATE()) * 5",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "table_variable_PendingOrders",
+          "expression": "CASE WHEN ltv.decile_rank <= 2 THEN 30 WHEN ltv.decile_rank <= 5 THEN 20 ELSE 10 END + CASE WHEN os.shipping_method = 'express' THEN 20 WHEN os.shipping_method = 'priority' THEN 10 ELSE 0 END + DATEDIFF(DAY, os.order_date, GETDATE()) * 5",
+          "output_column": "priority_score"
+        }
+      ],
+      "notes": "Calculates shipping priority: customer tier points + shipping method urgency + age penalty (5 points per day)"
+    },
+    {
+      "target_table": "dbo.RevenueByProduct",
+      "target_column": "gross_margin",
+      "source_columns": [
+        "dbo.OrderItems.quantity",
+        "dbo.OrderItems.unit_price",
+        "dbo.Products.cost_price"
+      ],
+      "transformation": "SUM(oi.quantity * oi.unit_price) - SUM(oi.quantity * p.cost_price)",
+      "transformation_type": "calculation",
+      "intermediate_steps": [],
+      "notes": "Calculates gross profit by subtracting total cost of goods from gross revenue"
+    },
+    {
+      "target_table": "dbo.RevenueByProduct",
+      "target_column": "margin_pct",
+      "source_columns": [
+        "dbo.OrderItems.quantity",
+        "dbo.OrderItems.unit_price",
+        "dbo.Products.cost_price"
+      ],
+      "transformation": "CASE WHEN SUM(oi.quantity * oi.unit_price) = 0 THEN 0 ELSE (SUM(oi.quantity * oi.unit_price) - SUM(oi.quantity * p.cost_price)) / SUM(oi.quantity * oi.unit_price) * 100 END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [],
+      "notes": "Calculates gross margin percentage; handles division by zero with zero revenue"
+    },
+    {
+      "target_table": "dbo.RevenueByProduct",
+      "target_column": "rank_by_revenue",
+      "source_columns": [
+        "dbo.OrderItems.quantity",
+        "dbo.OrderItems.unit_price"
+      ],
+      "transformation": "RANK() OVER (ORDER BY SUM(oi.quantity * oi.unit_price) DESC)",
+      "transformation_type": "window_function",
+      "intermediate_steps": [],
+      "notes": "Ranks products by total revenue in descending order (1 = highest revenue)"
+    },
+    {
+      "target_table": "dbo.MonthlyKPI",
+      "target_column": "mom_growth_pct",
+      "source_columns": [
+        "dbo.DailyRevenue.revenue"
+      ],
+      "transformation": "CASE WHEN prev.prev_month_revenue = 0 THEN NULL ELSE (SUM(dr.revenue) - prev.prev_month_revenue) / prev.prev_month_revenue * 100 END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "temp_table_KPI_Current",
+          "expression": "CASE WHEN prev.prev_month_revenue = 0 THEN NULL ELSE (SUM(dr.revenue) - prev.prev_month_revenue) / prev.prev_month_revenue * 100 END",
+          "output_column": "mom_growth_pct"
+        }
+      ],
+      "notes": "Calculates month-over-month revenue growth percentage; returns NULL for zero previous month revenue"
+    },
+    {
+      "target_table": "dbo.MonthlyKPI",
+      "target_column": "returning_customers",
+      "source_columns": [
+        "dbo.Orders.customer_id",
+        "dbo.Orders.order_date"
+      ],
+      "transformation": "COUNT(DISTINCT o1.customer_id) FROM dbo.Orders o1 WHERE o1.order_date BETWEEN @MonthStart AND @MonthEnd AND EXISTS (SELECT 1 FROM dbo.Orders o2 WHERE o2.customer_id = o1.customer_id AND o2.order_date < @MonthStart)",
+      "transformation_type": "conditional",
+      "intermediate_steps": [
+        {
+          "component_name": "temp_table_KPI_Current",
+          "expression": "COUNT(DISTINCT o1.customer_id) WHERE EXISTS previous orders",
+          "output_column": "returning_customers"
+        }
+      ],
+      "notes": "Counts customers who placed orders in current month and had previous orders before the month started"
+    },
+    {
+      "target_table": "staging.OrderStaging",
+      "target_column": "customer_email",
+      "source_columns": [
+        "staging.RawOrderFeed.email"
+      ],
+      "transformation": "LOWER(TRIM(ro.email))",
+      "transformation_type": "string_manipulation",
+      "intermediate_steps": [],
+      "notes": "Cleanses email by trimming whitespace and converting to lowercase for consistency"
+    },
+    {
+      "target_table": "staging.OrderStaging",
+      "target_column": "order_date_parsed",
+      "source_columns": [
+        "staging.RawOrderFeed.order_date_text"
+      ],
+      "transformation": "TRY_CAST(ro.order_date_text AS DATE)",
+      "transformation_type": "type_cast",
+      "intermediate_steps": [],
+      "notes": "Attempts to parse text date string into DATE type; returns NULL if invalid"
+    },
+    {
+      "target_table": "staging.OrderStaging",
+      "target_column": "is_valid",
+      "source_columns": [
+        "staging.RawOrderFeed.order_date_text",
+        "staging.RawOrderFeed.qty",
+        "staging.RawOrderFeed.price",
+        "staging.RawOrderFeed.email",
+        "staging.RawOrderFeed.sku"
+      ],
+      "transformation": "CASE WHEN TRY_CAST(ro.order_date_text AS DATE) IS NULL THEN 0 WHEN ro.qty <= 0 THEN 0 WHEN ro.price < 0 THEN 0 WHEN ro.email IS NULL OR ro.email = '' THEN 0 WHEN ro.sku IS NULL OR ro.sku = '' THEN 0 ELSE 1 END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [],
+      "notes": "Validates record quality: requires valid date, positive quantity and price, non-empty email and SKU"
+    },
+    {
+      "target_table": "dbo.CustomerScorecard",
+      "target_column": "tenure_days",
+      "source_columns": [
+        "dbo.Customers.signup_date"
+      ],
+      "transformation": "DATEDIFF(DAY, c.signup_date, GETDATE())",
+      "transformation_type": "date_manipulation",
+      "intermediate_steps": [
+        {
+          "component_name": "cte_CustomerBase",
+          "expression": "DATEDIFF(DAY, c.signup_date, GETDATE())",
+          "output_column": "tenure_days"
+        }
+      ],
+      "notes": "Calculates customer tenure as number of days since account signup"
+    },
+    {
+      "target_table": "dbo.CustomerScorecard",
+      "target_column": "engagement_score",
+      "source_columns": [
+        "dbo.Orders.order_date",
+        "dbo.OrderSummary.grand_total",
+        "dbo.CustomerLifetimeValue.decile_rank"
+      ],
+      "transformation": "LEAST(100, (CASE WHEN om.last_order IS NULL THEN 0 WHEN DATEDIFF(DAY, om.last_order, GETDATE()) <= 30 THEN 40 WHEN DATEDIFF(DAY, om.last_order, GETDATE()) <= 90 THEN 25 WHEN DATEDIFF(DAY, om.last_order, GETDATE()) <= 180 THEN 10 ELSE 0 END) + (CASE WHEN om.order_count >= 20 THEN 30 WHEN om.order_count >= 10 THEN 20 WHEN om.order_count >= 3 THEN 10 ELSE 5 END) + (CASE WHEN ltv.decile_rank <= 2 THEN 30 WHEN ltv.decile_rank <= 5 THEN 20 ELSE 10 END))",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "cte_EngagementScore",
+          "expression": "LEAST(100, recency_score + frequency_score + value_score)",
+          "output_column": "engagement_score"
+        }
+      ],
+      "notes": "Calculates engagement score (0-100) combining recency (40 pts), frequency (30 pts), and value tier (30 pts)"
+    },
+    {
+      "target_table": "dbo.CustomerScorecard",
+      "target_column": "engagement_label",
+      "source_columns": [
+        "dbo.Orders.order_date",
+        "dbo.OrderSummary.grand_total",
+        "dbo.CustomerLifetimeValue.decile_rank"
+      ],
+      "transformation": "CASE WHEN es.engagement_score >= 70 THEN 'Highly Engaged' WHEN es.engagement_score >= 40 THEN 'Moderately Engaged' ELSE 'Low Engagement' END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "cte_EngagementScore",
+          "expression": "engagement_score calculation",
+          "output_column": "engagement_score"
+        }
+      ],
+      "notes": "Categorizes customers: Highly Engaged (70+), Moderately Engaged (40-69), Low Engagement (<40)"
+    }
+  ],
+  "data_flow_edges": [
+    {
+      "from_node": "dbo.Orders",
+      "to_node": "usp_RefreshOrderSummary",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "status",
+        "shipping_cost",
+        "payment_method",
+        "shipping_method"
+      ],
+      "edge_label": "filter: order_date BETWEEN @StartDate AND @EndDate AND status <> 'cancelled'"
+    },
+    {
+      "from_node": "dbo.Customers",
+      "to_node": "usp_RefreshOrderSummary",
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "state"
+      ],
+      "edge_label": "inner join on customer_id"
+    },
+    {
+      "from_node": "dbo.OrderItems",
+      "to_node": "usp_RefreshOrderSummary",
+      "columns": [
+        "order_id",
+        "item_id",
+        "quantity",
+        "unit_price",
+        "discount_amount"
+      ],
+      "edge_label": "inner join on order_id"
+    },
+    {
+      "from_node": "dbo.TaxRates",
+      "to_node": "usp_RefreshOrderSummary",
+      "columns": [
+        "state",
+        "tax_rate"
+      ],
+      "edge_label": "left join on customer state"
+    },
+    {
+      "from_node": "dbo.CustomerAddresses",
+      "to_node": "usp_RefreshOrderSummary",
+      "columns": [
+        "customer_id",
+        "region"
+      ],
+      "edge_label": "left join on customer_id AND address_type = 'shipping'"
+    },
+    {
+      "from_node": "dbo.ShippingProviders",
+      "to_node": "usp_RefreshOrderSummary",
+      "columns": [
+        "provider_name",
+        "avg_delivery_days"
+      ],
+      "edge_label": "left join on shipping_method = provider_name"
+    },
+    {
+      "from_node": "usp_RefreshOrderSummary",
+      "to_node": "dbo.OrderSummary",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "customer_name",
+        "customer_email",
+        "order_date",
+        "order_status",
+        "item_count",
+        "subtotal",
+        "discount_total",
+        "tax_total",
+        "shipping_total",
+        "grand_total",
+        "payment_method",
+        "shipping_method",
+        "estimated_delivery",
+        "region",
+        "etl_timestamp"
+      ],
+      "edge_label": "delete existing + insert new for date range"
+    },
+    {
+      "from_node": "dbo.OrderSummary",
+      "to_node": "temp_table_DailyCalc",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "grand_total",
+        "order_date"
+      ],
+      "edge_label": "filter: order_date = @ReportDate"
+    },
+    {
+      "from_node": "dbo.Orders",
+      "to_node": "temp_table_DailyCalc",
+      "columns": [
+        "order_id",
+        "channel"
+      ],
+      "edge_label": "inner join on order_id"
+    },
+    {
+      "from_node": "dbo.Customers",
+      "to_node": "temp_table_DailyCalc",
+      "columns": [
+        "customer_id",
+        "signup_date"
+      ],
+      "edge_label": "inner join on customer_id"
+    },
+    {
+      "from_node": "dbo.CustomerAddresses",
+      "to_node": "temp_table_DailyCalc",
+      "columns": [
+        "customer_id",
+        "region"
+      ],
+      "edge_label": "left join on customer_id AND address_type = 'billing'"
+    },
+    {
+      "from_node": "temp_table_DailyCalc",
+      "to_node": "dbo.DailyRevenue",
+      "columns": [
+        "report_date",
+        "region",
+        "channel",
+        "order_count",
+        "revenue",
+        "avg_order_value",
+        "new_customers"
+      ],
+      "edge_label": "merge on report_date, region, channel"
+    },
+    {
+      "from_node": "dbo.Customers",
+      "to_node": "temp_table_LTV_Calc",
+      "columns": [
+        "customer_id"
+      ],
+      "edge_label": "base customer list"
+    },
+    {
+      "from_node": "dbo.Orders",
+      "to_node": "temp_table_LTV_Calc",
+      "columns": [
+        "customer_id",
+        "order_id",
+        "order_date"
+      ],
+      "edge_label": "inner join on customer_id, filter: status <> 'cancelled'"
+    },
+    {
+      "from_node": "dbo.OrderSummary",
+      "to_node": "temp_table_LTV_Calc",
+      "columns": [
+        "order_id",
+        "grand_total"
+      ],
+      "edge_label": "inner join on order_id"
+    },
+    {
+      "from_node": "temp_table_LTV_Calc",
+      "to_node": "dbo.CustomerLifetimeValue",
+      "columns": [
+        "customer_id",
+        "total_orders",
+        "total_spend",
+        "avg_order_value",
+        "months_active",
+        "last_order_date",
+        "days_dormant",
+        "predicted_annual_value",
+        "decile_rank"
+      ],
+      "edge_label": "merge on customer_id"
+    },
+    {
+      "from_node": "dbo.Inventory",
+      "to_node": "usp_SnapshotInventory",
+      "columns": [
+        "product_id",
+        "warehouse_id",
+        "quantity_on_hand",
+        "quantity_reserved",
+        "reorder_point",
+        "last_restock_date"
+      ],
+      "edge_label": "base inventory data"
+    },
+    {
+      "from_node": "dbo.Products",
+      "to_node": "usp_SnapshotInventory",
+      "columns": [
+        "product_id",
+        "product_name",
+        "category"
+      ],
+      "edge_label": "inner join on product_id"
+    },
+    {
+      "from_node": "dbo.OrderItems",
+      "to_node": "subquery_sales_30d",
+      "columns": [
+        "order_id",
+        "product_id",
+        "quantity"
+      ],
+      "edge_label": "sales velocity calculation"
+    },
+    {
+      "from_node": "dbo.Orders",
+      "to_node": "subquery_sales_30d",
+      "columns": [
+        "order_id",
+        "order_date",
+        "status"
+      ],
+      "edge_label": "inner join on order_id, filter: order_date >= DATEADD(DAY, -30, @SnapshotDate) AND status NOT IN ('cancelled', 'returned')"
+    },
+    {
+      "from_node": "subquery_sales_30d",
+      "to_node": "usp_SnapshotInventory",
+      "columns": [
+        "product_id",
+        "daily_avg"
+      ],
+      "edge_label": "left join on product_id for days of supply calculation"
+    },
+    {
+      "from_node": "usp_SnapshotInventory",
+      "to_node": "dbo.InventorySnapshot",
+      "columns": [
+        "snapshot_date",
+        "product_id",
+        "product_name",
+        "category",
+        "warehouse_id",
+        "quantity_on_hand",
+        "quantity_reserved",
+        "quantity_available",
+        "reorder_point",
+        "is_low_stock",
+        "days_of_supply",
+        "last_restock_date"
+      ],
+      "edge_label": "insert snapshot records"
+    },
+    {
+      "from_node": "dbo.OrderSummary",
+      "to_node": "table_variable_PendingOrders",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "shipping_method",
+        "region",
+        "grand_total",
+        "order_status"
+      ],
+      "edge_label": "filter: order_status = 'confirmed' AND not in shipping queue"
+    },
+    {
+      "from_node": "dbo.CustomerLifetimeValue",
+      "to_node": "table_variable_PendingOrders",
+      "columns": [
+        "customer_id",
+        "decile_rank"
+      ],
+      "edge_label": "left join on customer_id for tier assignment"
+    },
+    {
+      "from_node": "dbo.ShippingQueue",
+      "to_node": "table_variable_PendingOrders",
+      "columns": [
+        "order_id"
+      ],
+      "edge_label": "NOT EXISTS check to exclude already queued orders"
+    },
+    {
+      "from_node": "table_variable_PendingOrders",
+      "to_node": "dbo.ShippingQueue",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "shipping_method",
+        "region",
+        "grand_total",
+        "customer_tier",
+        "priority_score"
+      ],
+      "edge_label": "insert ordered by priority_score DESC"
+    },
+    {
+      "from_node": "dbo.OrderItems",
+      "to_node": "usp_RevenueByProduct",
+      "columns": [
+        "order_id",
+        "product_id",
+        "quantity",
+        "unit_price"
+      ],
+      "edge_label": "base order item data"
+    },
+    {
+      "from_node": "dbo.Orders",
+      "to_node": "usp_RevenueByProduct",
+      "columns": [
+        "order_id",
+        "order_date",
+        "status"
+      ],
+      "edge_label": "inner join on order_id, filter: order_date BETWEEN @StartDate AND @EndDate AND status NOT IN ('cancelled')"
+    },
+    {
+      "from_node": "dbo.Products",
+      "to_node": "usp_RevenueByProduct",
+      "columns": [
+        "product_id",
+        "product_name",
+        "category",
+        "cost_price"
+      ],
+      "edge_label": "inner join on product_id"
+    },
+    {
+      "from_node": "dbo.OrderItems",
+      "to_node": "subquery_returns",
+      "columns": [
+        "product_id",
+        "quantity",
+        "return_amount"
+      ],
+      "edge_label": "return calculations"
+    },
+    {
+      "from_node": "dbo.Orders",
+      "to_node": "subquery_returns",
+      "columns": [
+        "order_id",
+        "status",
+        "order_date"
+      ],
+      "edge_label": "inner join on order_id, filter: status = 'returned' AND order_date BETWEEN @StartDate AND @EndDate"
+    },
+    {
+      "from_node": "subquery_returns",
+      "to_node": "usp_RevenueByProduct",
+      "columns": [
+        "product_id",
+        "return_units",
+        "refund_total"
+      ],
+      "edge_label": "left join on product_id for net revenue calculation"
+    },
+    {
+      "from_node": "usp_RevenueByProduct",
+      "to_node": "dbo.RevenueByProduct",
+      "columns": [
+        "report_start",
+        "report_end",
+        "product_id",
+        "product_name",
+        "category",
+        "units_sold",
+        "gross_revenue",
+        "cost_of_goods",
+        "gross_margin",
+        "margin_pct",
+        "avg_selling_price",
+        "return_units",
+        "net_revenue",
+        "rank_by_revenue",
+        "rank_by_units"
+      ],
+      "edge_label": "delete existing + insert new for period"
+    },
+    {
+      "from_node": "dbo.DailyRevenue",
+      "to_node": "temp_table_KPI_Current",
+      "columns": [
+        "report_date",
+        "revenue",
+        "order_count",
+        "new_customers"
+      ],
+      "edge_label": "filter: report_date BETWEEN @MonthStart AND @MonthEnd"
+    },
+    {
+      "from_node": "dbo.Orders",
+      "to_node": "temp_table_KPI_Current",
+      "columns": [
+        "customer_id",
+        "order_date",
+        "status"
+      ],
+      "edge_label": "subqueries for active and returning customer counts"
+    },
+    {
+      "from_node": "temp_table_KPI_Current",
+      "to_node": "dbo.MonthlyKPI",
+      "columns": [
+        "kpi_month",
+        "total_revenue",
+        "total_orders",
+        "avg_order_value",
+        "new_customers",
+        "mom_growth_pct",
+        "active_customers",
+        "returning_customers"
+      ],
+      "edge_label": "merge on kpi_month"
+    },
+    {
+      "from_node": "staging.RawOrderFeed",
+      "to_node": "usp_StageIncomingOrders",
+      "columns": [
+        "raw_id",
+        "email",
+        "sku",
+        "qty",
+        "price",
+        "order_date_text",
+        "currency",
+        "channel"
+      ],
+      "edge_label": "filter: processed = 0"
+    },
+    {
+      "from_node": "usp_StageIncomingOrders",
+      "to_node": "staging.OrderStaging",
+      "columns": [
+        "batch_id",
+        "raw_order_id",
+        "customer_email",
+        "product_sku",
+        "quantity",
+        "unit_price",
+        "order_date_str",
+        "order_date_parsed",
+        "currency",
+        "channel",
+        "is_valid",
+        "validation_errors",
+        "staged_at"
+      ],
+      "edge_label": "insert with validation and cleansing"
+    },
+    {
+      "from_node": "staging.OrderStaging",
+      "to_node": "usp_PromoteStaging",
+      "columns": [
+        "batch_id",
+        "customer_email",
+        "product_sku",
+        "quantity",
+        "unit_price",
+        "order_date_parsed",
+        "channel",
+        "is_valid"
+      ],
+      "edge_label": "filter: batch_id = @BatchId AND is_valid = 1"
+    },
+    {
+      "from_node": "dbo.Customers",
+      "to_node": "usp_PromoteStaging",
+      "columns": [
+        "customer_id",
+        "email"
+      ],
+      "edge_label": "inner join on email for customer matching"
+    },
+    {
+      "from_node": "dbo.Products",
+      "to_node": "usp_PromoteStaging",
+      "columns": [
+        "product_id",
+        "sku"
+      ],
+      "edge_label": "inner join on sku for product matching"
+    },
+    {
+      "from_node": "dbo.Promotions",
+      "to_node": "usp_PromoteStaging",
+      "columns": [
+        "product_id",
+        "discount_pct",
+        "is_active",
+        "start_date",
+        "end_date"
+      ],
+      "edge_label": "left join for discount calculation"
+    },
+    {
+      "from_node": "usp_PromoteStaging",
+      "to_node": "dbo.Orders",
+      "columns": [
+        "customer_id",
+        "order_date",
+        "status",
+        "channel",
+        "payment_method",
+        "shipping_method",
+        "shipping_cost",
+        "created_at"
+      ],
+      "edge_label": "insert new orders from staging"
+    },
+    {
+      "from_node": "usp_PromoteStaging",
+      "to_node": "dbo.OrderItems",
+      "columns": [
+        "order_id",
+        "product_id",
+        "quantity",
+        "unit_price",
+        "discount_amount"
+      ],
+      "edge_label": "insert order items from staging"
+    },
+    {
+      "from_node": "dbo.Customers",
+      "to_node": "cte_CustomerBase",
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "signup_date",
+        "status"
+      ],
+      "edge_label": "filter: status = 'active' AND (@CustomerId IS NULL OR customer_id = @CustomerId)"
+    },
+    {
+      "from_node": "cte_CustomerBase",
+      "to_node": "cte_OrderMetrics",
+      "columns": [
+        "customer_id"
+      ],
+      "edge_label": "base for order aggregation"
+    },
+    {
+      "from_node": "dbo.Orders",
+      "to_node": "cte_OrderMetrics",
+      "columns": [
+        "customer_id",
+        "order_id",
+        "order_date"
+      ],
+      "edge_label": "left join on customer_id, filter: status NOT IN ('cancelled', 'returned')"
+    },
+    {
+      "from_node": "dbo.OrderSummary",
+      "to_node": "cte_OrderMetrics",
+      "columns": [
+        "order_id",
+        "grand_total"
+      ],
+      "edge_label": "left join on order_id"
+    },
+    {
+      "from_node": "cte_CustomerBase",
+      "to_node": "cte_EngagementScore",
+      "columns": [
+        "customer_id"
+      ],
+      "edge_label": "base for engagement calculation"
+    },
+    {
+      "from_node": "cte_OrderMetrics",
+      "to_node": "cte_EngagementScore",
+      "columns": [
+        "customer_id",
+        "order_count",
+        "last_order"
+      ],
+      "edge_label": "left join on customer_id"
+    },
+    {
+      "from_node": "dbo.CustomerLifetimeValue",
+      "to_node": "cte_EngagementScore",
+      "columns": [
+        "customer_id",
+        "decile_rank"
+      ],
+      "edge_label": "left join on customer_id"
+    },
+    {
+      "from_node": "cte_CustomerBase",
+      "to_node": "usp_GenerateCustomerScorecard",
+      "columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "signup_date",
+        "tenure_days"
+      ],
+      "edge_label": "base customer data"
+    },
+    {
+      "from_node": "cte_OrderMetrics",
+      "to_node": "usp_GenerateCustomerScorecard",
+      "columns": [
+        "customer_id",
+        "order_count",
+        "total_spend",
+        "avg_order",
+        "last_order"
+      ],
+      "edge_label": "left join on customer_id"
+    },
+    {
+      "from_node": "dbo.CustomerLifetimeValue",
+      "to_node": "usp_GenerateCustomerScorecard",
+      "columns": [
+        "customer_id",
+        "predicted_annual_value",
+        "decile_rank"
+      ],
+      "edge_label": "left join on customer_id"
+    },
+    {
+      "from_node": "cte_EngagementScore",
+      "to_node": "usp_GenerateCustomerScorecard",
+      "columns": [
+        "customer_id",
+        "engagement_score"
+      ],
+      "edge_label": "left join on customer_id"
+    },
+    {
+      "from_node": "usp_GenerateCustomerScorecard",
+      "to_node": "dbo.CustomerScorecard",
+      "columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "signup_date",
+        "tenure_days",
+        "order_count",
+        "total_spend",
+        "avg_order",
+        "last_order",
+        "predicted_annual_value",
+        "decile_rank",
+        "engagement_score",
+        "engagement_label",
+        "scored_at"
+      ],
+      "edge_label": "merge on customer_id"
+    },
+    {
+      "from_node": "dbo.Orders",
+      "to_node": "usp_CleanupOldData",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "status"
+      ],
+      "edge_label": "filter: order_date < @CutoffDate AND status IN ('delivered', 'returned', 'cancelled')"
+    },
+    {
+      "from_node": "dbo.OrderItems",
+      "to_node": "usp_CleanupOldData",
+      "columns": [
+        "order_id",
+        "item_id"
+      ],
+      "edge_label": "inner join with orders for deletion"
+    },
+    {
+      "from_node": "usp_CleanupOldData",
+      "to_node": "archive.Orders",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "status",
+        "archived_at"
+      ],
+      "edge_label": "archive old completed orders"
+    },
+    {
+      "from_node": "dbo.AuditLog",
+      "to_node": "usp_CleanupOldData",
+      "columns": [
+        "exec_timestamp"
+      ],
+      "edge_label": "delete: exec_timestamp < DATEADD(DAY, -365, GETDATE())"
+    },
+    {
+      "from_node": "dbo.InventorySnapshot",
+      "to_node": "usp_CleanupOldData",
+      "columns": [
+        "snapshot_date"
+      ],
+      "edge_label": "delete: snapshot_date < DATEADD(MONTH, -6, GETDATE())"
+    }
+  ]
+}

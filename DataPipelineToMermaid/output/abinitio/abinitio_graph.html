@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>customer_order_analytics — Data Lineage</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0; padding: 2rem; background: #fafafa;
+    }
+    h1 { color: #2F5496; margin-bottom: .5rem; }
+    .subtitle { color: #666; margin-bottom: 2rem; }
+    .mermaid { background: #fff; border: 1px solid #ddd; border-radius: 8px;
+               padding: 2rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>customer_order_analytics</h1>
+  <p class="subtitle">Data Lineage Diagram</p>
+  <div class="mermaid">
+flowchart LR
+    subgraph Sources["📥 Source Tables"]
+        sales_orders["sales.orders&lt;br/>&lt;i>order_id, customer_id, order_date, total_amount, discount..."]
+        crm_customers["crm.customers&lt;br/>&lt;i>customer_id, first_name, last_name, email, signup_date, ..."]
+        order_items_csv["order_items.csv&lt;br/>&lt;i>item_id, order_id, product_id, product_name, category,..."]
+        exchange_rates_dat["exchange_rates.dat&lt;br/>&lt;i>currency_code, usd_rate, rate_date&lt;/i>"]
+        product_hierarchy_dat["product_hierarchy.dat&lt;br/>&lt;i>product_id, department, sub_category, brand, is_..."]
+    end
+    subgraph Transforms["⚙️ Transformations"]
+        read_orders[/"read_orders&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        read_customers[/"read_customers&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        read_order_items[/"read_order_items&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        lookup_exchange_rates[/"lookup_exchange_rates&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        lookup_product_hierarchy[/"lookup_product_hierarchy&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        filter_valid_orders[/"filter_valid_orders&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        filter_high_value_items[/"filter_high_value_items&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        join_order_customer[/"join_order_customer&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        join_order_items[/"join_order_items&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        rollup_by_customer[/"rollup_by_customer&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        assign_customer_tier[/"assign_customer_tier&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        dedup_customers[/"dedup_customers&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        partition_output[/"partition_output&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        write_customer_analytics[/"write_customer_analytics&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+        write_summary_file[/"write_summary_file&lt;br/>&lt;i>abinitio_component&lt;/i>"\]
+    end
+    subgraph Targets["📤 Target Tables"]
+        analytics_customer_daily_summary["analytics.customer_daily_summary&lt;br/>&lt;i>customer_id, customer_name, email, co..."]
+        customer_summary___DATA_DATE__csv["customer_summary_${DATA_DATE}.csv&lt;br/>&lt;i>customer_id, customer_name, region, ..."]
+    end
+    sales_orders -->|"read from Oracle; filter: order_date = ${DATA_D..."| read_orders
+    crm_customers -->|"read from Oracle; filter: is_active = 1"| read_customers
+    order_items_csv -->|"read from CSV file"| read_order_items
+    read_orders -->|"lookup exchange_rates.dat on currency_code; enr..."| lookup_exchange_rates
+    exchange_rates_dat -->|"lookup reference data"| lookup_exchange_rates
+    read_order_items -->|"lookup product_hierarchy.dat on product_id; enr..."| lookup_product_hierarchy
+    product_hierarchy_dat -->|"lookup reference data"| lookup_product_hierarchy
+    lookup_exchange_rates -->|"filter: amount_usd > 0 AND order_status IN ('co..."| filter_valid_orders
+    lookup_product_hierarchy -->|"filter: quantity > 0 AND unit_price > 0"| filter_high_value_items
+    filter_valid_orders -->|"left side of inner join on customer_id"| join_order_customer
+    read_customers -->|"right side of inner join on customer_id; enrich..."| join_order_customer
+    join_order_customer -->|"left side of left outer join on order_id"| join_order_items
+    filter_high_value_items -->|"right side of left outer join on order_id; add ..."| join_order_items
+    join_order_items -->|"aggregate by customer_id; calculate metrics: to..."| rollup_by_customer
+    rollup_by_customer -->|"assign tier and engagement score based on reven..."| assign_customer_tier
+    assign_customer_tier -->|"dedup on customer_id, keep first"| dedup_customers
+    dedup_customers -->|"partition by round-robin into 4 partitions for ..."| partition_output
+    partition_output -->|"merge into analytics.customer_daily_summary on ..."| write_customer_analytics
+    dedup_customers -->|"write subset to CSV file for distribution"| write_summary_file
+
+    classDef source fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef target fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef transform fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    class sales_orders source
+    class crm_customers source
+    class order_items_csv source
+    class exchange_rates_dat source
+    class product_hierarchy_dat source
+    class analytics_customer_daily_summary target
+    class customer_summary___DATA_DATE__csv target
+    class read_orders transform
+    class read_customers transform
+    class read_order_items transform
+    class lookup_exchange_rates transform
+    class lookup_product_hierarchy transform
+    class filter_valid_orders transform
+    class filter_high_value_items transform
+    class join_order_customer transform
+    class join_order_items transform
+    class rollup_by_customer transform
+    class assign_customer_tier transform
+    class dedup_customers transform
+    class partition_output transform
+    class write_customer_analytics transform
+    class write_summary_file transform
+  </div>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default',
+    flowchart: { curve: 'basis', useMaxWidth: false } });</script>
+</body>
+</html>

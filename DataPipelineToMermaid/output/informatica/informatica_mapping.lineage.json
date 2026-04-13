@@ -1,0 +1,1064 @@
+{
+  "pipeline_name": "Sales Data Warehouse Load - m_Sales_Fact_Load",
+  "pipeline_type": "informatica",
+  "source_file": "DataPipelineToMermaid/test_fixtures/informatica_mapping.xml",
+  "description": "Loads sales transaction data from operational systems into a data warehouse fact table. Reads transaction headers and line items, enriches with product categories and store regions through lookups, converts all monetary amounts to USD, calculates margin bands, validates data quality, and generates surrogate keys for the final fact table used in sales analysis and reporting.",
+  "sources": [
+    {
+      "schema_name": "SRC_SALES",
+      "table_name": "TRANSACTIONS",
+      "columns": [
+        {
+          "name": "TXN_ID",
+          "data_type": "number(12,0)",
+          "description": "Unique transaction identifier"
+        },
+        {
+          "name": "CUSTOMER_ID",
+          "data_type": "number(12,0)",
+          "description": "Customer identifier"
+        },
+        {
+          "name": "STORE_ID",
+          "data_type": "number(8,0)",
+          "description": "Store identifier"
+        },
+        {
+          "name": "TXN_DATE",
+          "data_type": "date/time",
+          "description": "Transaction date"
+        },
+        {
+          "name": "TOTAL_AMT",
+          "data_type": "number(14,2)",
+          "description": "Total transaction amount"
+        },
+        {
+          "name": "DISCOUNT_AMT",
+          "data_type": "number(10,2)",
+          "description": "Discount amount applied"
+        },
+        {
+          "name": "TAX_AMT",
+          "data_type": "number(10,2)",
+          "description": "Tax amount"
+        },
+        {
+          "name": "PAYMENT_METHOD",
+          "data_type": "varchar2(30)",
+          "description": "Payment method used"
+        },
+        {
+          "name": "CHANNEL",
+          "data_type": "varchar2(20)",
+          "description": "Sales channel"
+        },
+        {
+          "name": "CURRENCY_CD",
+          "data_type": "varchar2(3)",
+          "description": "Currency code"
+        },
+        {
+          "name": "TXN_STATUS",
+          "data_type": "varchar2(20)",
+          "description": "Transaction status"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "SRC_SALES",
+      "table_name": "TRANSACTION_DETAILS",
+      "columns": [
+        {
+          "name": "DETAIL_ID",
+          "data_type": "number(15,0)",
+          "description": "Unique detail line identifier"
+        },
+        {
+          "name": "TXN_ID",
+          "data_type": "number(12,0)",
+          "description": "Transaction identifier"
+        },
+        {
+          "name": "PRODUCT_ID",
+          "data_type": "number(10,0)",
+          "description": "Product identifier"
+        },
+        {
+          "name": "QUANTITY",
+          "data_type": "number(8,0)",
+          "description": "Quantity sold"
+        },
+        {
+          "name": "UNIT_PRICE",
+          "data_type": "number(10,2)",
+          "description": "Unit price"
+        },
+        {
+          "name": "LINE_TOTAL",
+          "data_type": "number(12,2)",
+          "description": "Line total amount"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "REF_DATA",
+      "table_name": "PRODUCT_MASTER",
+      "columns": [
+        {
+          "name": "PRODUCT_ID",
+          "data_type": "number(10,0)",
+          "description": "Product identifier"
+        },
+        {
+          "name": "PRODUCT_NAME",
+          "data_type": "varchar2(200)",
+          "description": "Product name"
+        },
+        {
+          "name": "CATEGORY",
+          "data_type": "varchar2(100)",
+          "description": "Product category"
+        },
+        {
+          "name": "COST_PRICE",
+          "data_type": "number(10,2)",
+          "description": "Product cost price"
+        },
+        {
+          "name": "UNIT_PRICE",
+          "data_type": "number(10,2)",
+          "description": "Product unit price"
+        },
+        {
+          "name": "IS_ACTIVE",
+          "data_type": "number(1,0)",
+          "description": "Active flag"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "REF_DATA",
+      "table_name": "STORE_MASTER",
+      "columns": [
+        {
+          "name": "STORE_ID",
+          "data_type": "number(8,0)",
+          "description": "Store identifier"
+        },
+        {
+          "name": "STORE_SK",
+          "data_type": "number(10,0)",
+          "description": "Store surrogate key"
+        },
+        {
+          "name": "STORE_REGION",
+          "data_type": "varchar2(50)",
+          "description": "Store region"
+        },
+        {
+          "name": "STORE_NAME",
+          "data_type": "varchar2(100)",
+          "description": "Store name"
+        }
+      ],
+      "table_type": "source"
+    }
+  ],
+  "targets": [
+    {
+      "schema_name": "DWH",
+      "table_name": "FACT_SALES",
+      "columns": [
+        {
+          "name": "SALES_SK",
+          "data_type": "number(15,0)",
+          "description": "Surrogate key for sales fact"
+        },
+        {
+          "name": "TXN_ID",
+          "data_type": "number(12,0)",
+          "description": "Transaction identifier"
+        },
+        {
+          "name": "CUSTOMER_ID",
+          "data_type": "number(12,0)",
+          "description": "Customer identifier"
+        },
+        {
+          "name": "PRODUCT_ID",
+          "data_type": "number(10,0)",
+          "description": "Product identifier"
+        },
+        {
+          "name": "STORE_SK",
+          "data_type": "number(10,0)",
+          "description": "Store surrogate key"
+        },
+        {
+          "name": "DATE_SK",
+          "data_type": "number(8,0)",
+          "description": "Date surrogate key"
+        },
+        {
+          "name": "QUANTITY",
+          "data_type": "number(8,0)",
+          "description": "Quantity sold"
+        },
+        {
+          "name": "UNIT_PRICE_USD",
+          "data_type": "number(10,2)",
+          "description": "Unit price in USD"
+        },
+        {
+          "name": "LINE_TOTAL_USD",
+          "data_type": "number(12,2)",
+          "description": "Line total in USD"
+        },
+        {
+          "name": "DISCOUNT_USD",
+          "data_type": "number(10,2)",
+          "description": "Discount amount in USD"
+        },
+        {
+          "name": "TAX_USD",
+          "data_type": "number(10,2)",
+          "description": "Tax amount in USD"
+        },
+        {
+          "name": "NET_AMOUNT_USD",
+          "data_type": "number(14,2)",
+          "description": "Net amount in USD"
+        },
+        {
+          "name": "PAYMENT_METHOD",
+          "data_type": "varchar2(30)",
+          "description": "Payment method"
+        },
+        {
+          "name": "CHANNEL",
+          "data_type": "varchar2(20)",
+          "description": "Sales channel"
+        },
+        {
+          "name": "PRODUCT_CATEGORY",
+          "data_type": "varchar2(100)",
+          "description": "Product category"
+        },
+        {
+          "name": "STORE_REGION",
+          "data_type": "varchar2(50)",
+          "description": "Store region"
+        },
+        {
+          "name": "MARGIN_BAND",
+          "data_type": "varchar2(20)",
+          "description": "Margin band classification"
+        },
+        {
+          "name": "LOAD_DATE",
+          "data_type": "date/time",
+          "description": "Record load date"
+        }
+      ],
+      "table_type": "target"
+    }
+  ],
+  "components": [
+    {
+      "name": "SQ_TRANSACTIONS",
+      "component_type": "transformation",
+      "description": "Filters transaction data to exclude cancelled and fraudulent transactions, and only includes transactions from the last day. Applies business rule: TXN_STATUS NOT IN ('CANCELLED', 'FRAUDULENT') AND TXN_DATE >= TRUNC(SYSDATE) - 1",
+      "input_tables": [
+        "SRC_SALES.TRANSACTIONS"
+      ],
+      "output_columns": [
+        "TXN_ID",
+        "CUSTOMER_ID",
+        "STORE_ID",
+        "TXN_DATE",
+        "TOTAL_AMT",
+        "DISCOUNT_AMT",
+        "TAX_AMT",
+        "PAYMENT_METHOD",
+        "CHANNEL",
+        "CURRENCY_CD",
+        "TXN_STATUS"
+      ],
+      "sql_text": "SELECT TXN_ID, CUSTOMER_ID, STORE_ID, TXN_DATE, TOTAL_AMT, DISCOUNT_AMT, TAX_AMT, PAYMENT_METHOD, CHANNEL, CURRENCY_CD, TXN_STATUS FROM SRC_SALES.TRANSACTIONS WHERE TXN_STATUS NOT IN ('CANCELLED', 'FRAUDULENT') AND TXN_DATE >= TRUNC(SYSDATE) - 1"
+    },
+    {
+      "name": "SQ_TRANSACTION_DETAILS",
+      "component_type": "transformation",
+      "description": "Source qualifier for transaction detail records, passes through all line item data without filtering",
+      "input_tables": [
+        "SRC_SALES.TRANSACTION_DETAILS"
+      ],
+      "output_columns": [
+        "DETAIL_ID",
+        "TXN_ID",
+        "PRODUCT_ID",
+        "QUANTITY",
+        "UNIT_PRICE",
+        "LINE_TOTAL"
+      ],
+      "sql_text": "SELECT DETAIL_ID, TXN_ID, PRODUCT_ID, QUANTITY, UNIT_PRICE, LINE_TOTAL FROM SRC_SALES.TRANSACTION_DETAILS"
+    },
+    {
+      "name": "JNR_TXN_DETAILS",
+      "component_type": "transformation",
+      "description": "Inner joins transaction headers with transaction details on TXN_ID to combine header-level information (customer, store, payment method) with line-level information (product, quantity, pricing)",
+      "input_tables": [
+        "SQ_TRANSACTIONS",
+        "SQ_TRANSACTION_DETAILS"
+      ],
+      "output_columns": [
+        "TXN_ID",
+        "CUSTOMER_ID",
+        "STORE_ID",
+        "TXN_DATE",
+        "TOTAL_AMT",
+        "DISCOUNT_AMT",
+        "TAX_AMT",
+        "PAYMENT_METHOD",
+        "CHANNEL",
+        "CURRENCY_CD",
+        "DETAIL_ID",
+        "PRODUCT_ID",
+        "QUANTITY",
+        "UNIT_PRICE",
+        "LINE_TOTAL"
+      ],
+      "sql_text": "Normal Join: SQ_TRANSACTIONS.TXN_ID = SQ_TRANSACTION_DETAILS.TXN_ID"
+    },
+    {
+      "name": "LKP_PRODUCT_MASTER",
+      "component_type": "transformation",
+      "description": "Looks up product information including category and calculates margin percentage as (UNIT_PRICE - COST_PRICE) / NULLIF(UNIT_PRICE, 0) * 100. Only returns active products (IS_ACTIVE = 1)",
+      "input_tables": [
+        "REF_DATA.PRODUCT_MASTER"
+      ],
+      "output_columns": [
+        "PRODUCT_NAME",
+        "CATEGORY",
+        "COST_PRICE",
+        "MARGIN_PCT"
+      ],
+      "sql_text": "SELECT PRODUCT_ID, PRODUCT_NAME, CATEGORY, COST_PRICE, (UNIT_PRICE - COST_PRICE) / NULLIF(UNIT_PRICE, 0) * 100 AS MARGIN_PCT FROM REF_DATA.PRODUCT_MASTER WHERE IS_ACTIVE = 1"
+    },
+    {
+      "name": "LKP_STORE_MASTER",
+      "component_type": "transformation",
+      "description": "Looks up store information to get surrogate key and region for dimensional modeling",
+      "input_tables": [
+        "REF_DATA.STORE_MASTER"
+      ],
+      "output_columns": [
+        "STORE_SK",
+        "STORE_REGION",
+        "STORE_NAME"
+      ],
+      "sql_text": "Lookup condition: IN_STORE_ID = STORE_ID"
+    },
+    {
+      "name": "EXP_CURRENCY_CALC",
+      "component_type": "transformation",
+      "description": "Converts all monetary amounts to USD using exchange rate lookup, calculates net amount as line total minus discount plus tax, derives date surrogate key from transaction date, and assigns margin bands: High (≥50%), Medium (≥25%), Low (≥0%), Negative (<0%)",
+      "input_tables": [
+        "JNR_TXN_DETAILS",
+        "LKP_PRODUCT_MASTER",
+        "LKP_STORE_MASTER"
+      ],
+      "output_columns": [
+        "TXN_ID",
+        "CUSTOMER_ID",
+        "STORE_SK",
+        "TXN_DATE",
+        "PRODUCT_ID",
+        "QUANTITY",
+        "PAYMENT_METHOD",
+        "CHANNEL",
+        "CATEGORY",
+        "STORE_REGION",
+        "O_UNIT_PRICE_USD",
+        "O_LINE_TOTAL_USD",
+        "O_DISCOUNT_USD",
+        "O_TAX_USD",
+        "O_NET_AMOUNT_USD",
+        "O_DATE_SK",
+        "O_MARGIN_BAND"
+      ],
+      "sql_text": "O_UNIT_PRICE_USD = IIF(CURRENCY_CD = 'USD', UNIT_PRICE, UNIT_PRICE * :LKP.RETURN(LKP_FX_RATE, CURRENCY_CD, 'USD')); O_NET_AMOUNT_USD = O_LINE_TOTAL_USD - O_DISCOUNT_USD + O_TAX_USD; O_MARGIN_BAND = IIF(MARGIN_PCT >= 50, 'High', IIF(MARGIN_PCT >= 25, 'Medium', IIF(MARGIN_PCT >= 0, 'Low', 'Negative')))"
+    },
+    {
+      "name": "SEQ_SALES_SK",
+      "component_type": "transformation",
+      "description": "Generates sequential surrogate keys for the sales fact table starting from 1, incrementing by 1, with maximum value of 9999999999",
+      "input_tables": [],
+      "output_columns": [
+        "NEXTVAL",
+        "CURRVAL"
+      ],
+      "sql_text": "Start Value: 1, Increment By: 1, End Value: 9999999999, Cycle: NO"
+    },
+    {
+      "name": "RTR_VALIDATION",
+      "component_type": "transformation",
+      "description": "Routes records into valid and invalid groups. Valid records must have non-null CUSTOMER_ID and PRODUCT_ID, positive net amount USD, and positive quantity. Invalid records are routed to default group for error handling",
+      "input_tables": [
+        "EXP_CURRENCY_CALC"
+      ],
+      "output_columns": [
+        "TXN_ID",
+        "CUSTOMER_ID",
+        "PRODUCT_ID",
+        "STORE_SK",
+        "O_DATE_SK",
+        "QUANTITY",
+        "O_UNIT_PRICE_USD",
+        "O_LINE_TOTAL_USD",
+        "O_DISCOUNT_USD",
+        "O_TAX_USD",
+        "O_NET_AMOUNT_USD",
+        "PAYMENT_METHOD",
+        "CHANNEL",
+        "CATEGORY",
+        "STORE_REGION",
+        "O_MARGIN_BAND"
+      ],
+      "sql_text": "VALID_RECORDS: NOT ISNULL(CUSTOMER_ID) AND NOT ISNULL(PRODUCT_ID) AND O_NET_AMOUNT_USD > 0 AND QUANTITY > 0; INVALID_RECORDS: DEFAULT"
+    }
+  ],
+  "column_lineage": [
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "SALES_SK",
+      "source_columns": [
+        "SEQ_SALES_SK.NEXTVAL"
+      ],
+      "transformation": "NEXTVAL",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "SEQ_SALES_SK",
+          "expression": "NEXTVAL",
+          "output_column": "NEXTVAL"
+        }
+      ],
+      "notes": "Auto-generated surrogate key for sales fact table"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "TXN_ID",
+      "source_columns": [
+        "SRC_SALES.TRANSACTIONS.TXN_ID"
+      ],
+      "transformation": "TXN_ID",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "SQ_TRANSACTIONS",
+          "expression": "TXN_ID",
+          "output_column": "TXN_ID"
+        },
+        {
+          "component_name": "JNR_TXN_DETAILS",
+          "expression": "TXN_ID",
+          "output_column": "TXN_ID"
+        },
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "TXN_ID",
+          "output_column": "TXN_ID"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "TXN_ID",
+          "output_column": "TXN_ID"
+        }
+      ],
+      "notes": "Transaction identifier from source system"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "CUSTOMER_ID",
+      "source_columns": [
+        "SRC_SALES.TRANSACTIONS.CUSTOMER_ID"
+      ],
+      "transformation": "CUSTOMER_ID",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "SQ_TRANSACTIONS",
+          "expression": "CUSTOMER_ID",
+          "output_column": "CUSTOMER_ID"
+        },
+        {
+          "component_name": "JNR_TXN_DETAILS",
+          "expression": "CUSTOMER_ID",
+          "output_column": "CUSTOMER_ID"
+        },
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "CUSTOMER_ID",
+          "output_column": "CUSTOMER_ID"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "CUSTOMER_ID",
+          "output_column": "CUSTOMER_ID"
+        }
+      ],
+      "notes": "Customer identifier, validated to be non-null"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "PRODUCT_ID",
+      "source_columns": [
+        "SRC_SALES.TRANSACTION_DETAILS.PRODUCT_ID"
+      ],
+      "transformation": "PRODUCT_ID",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "SQ_TRANSACTION_DETAILS",
+          "expression": "PRODUCT_ID",
+          "output_column": "PRODUCT_ID"
+        },
+        {
+          "component_name": "JNR_TXN_DETAILS",
+          "expression": "PRODUCT_ID",
+          "output_column": "PRODUCT_ID"
+        },
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "PRODUCT_ID",
+          "output_column": "PRODUCT_ID"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "PRODUCT_ID",
+          "output_column": "PRODUCT_ID"
+        }
+      ],
+      "notes": "Product identifier, validated to be non-null"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "STORE_SK",
+      "source_columns": [
+        "REF_DATA.STORE_MASTER.STORE_SK"
+      ],
+      "transformation": "STORE_SK",
+      "transformation_type": "lookup",
+      "intermediate_steps": [
+        {
+          "component_name": "LKP_STORE_MASTER",
+          "expression": "STORE_SK",
+          "output_column": "STORE_SK"
+        },
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "STORE_SK",
+          "output_column": "STORE_SK"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "STORE_SK",
+          "output_column": "STORE_SK"
+        }
+      ],
+      "notes": "Store surrogate key from store master dimension"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "DATE_SK",
+      "source_columns": [
+        "SRC_SALES.TRANSACTIONS.TXN_DATE"
+      ],
+      "transformation": "TO_CHAR(TXN_DATE, 'YYYYMMDD')",
+      "transformation_type": "date_manipulation",
+      "intermediate_steps": [
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "TO_CHAR(TXN_DATE, 'YYYYMMDD')",
+          "output_column": "O_DATE_SK"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "O_DATE_SK",
+          "output_column": "O_DATE_SK"
+        }
+      ],
+      "notes": "Date surrogate key derived from transaction date in YYYYMMDD format"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "QUANTITY",
+      "source_columns": [
+        "SRC_SALES.TRANSACTION_DETAILS.QUANTITY"
+      ],
+      "transformation": "QUANTITY",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "SQ_TRANSACTION_DETAILS",
+          "expression": "QUANTITY",
+          "output_column": "QUANTITY"
+        },
+        {
+          "component_name": "JNR_TXN_DETAILS",
+          "expression": "QUANTITY",
+          "output_column": "QUANTITY"
+        },
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "QUANTITY",
+          "output_column": "QUANTITY"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "QUANTITY",
+          "output_column": "QUANTITY"
+        }
+      ],
+      "notes": "Quantity sold, validated to be positive"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "UNIT_PRICE_USD",
+      "source_columns": [
+        "SRC_SALES.TRANSACTION_DETAILS.UNIT_PRICE",
+        "SRC_SALES.TRANSACTIONS.CURRENCY_CD"
+      ],
+      "transformation": "IIF(CURRENCY_CD = 'USD', UNIT_PRICE, UNIT_PRICE * :LKP.RETURN(LKP_FX_RATE, CURRENCY_CD, 'USD'))",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "IIF(CURRENCY_CD = 'USD', UNIT_PRICE, UNIT_PRICE * :LKP.RETURN(LKP_FX_RATE, CURRENCY_CD, 'USD'))",
+          "output_column": "O_UNIT_PRICE_USD"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "O_UNIT_PRICE_USD",
+          "output_column": "O_UNIT_PRICE_USD"
+        }
+      ],
+      "notes": "Unit price converted to USD using exchange rate lookup"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "LINE_TOTAL_USD",
+      "source_columns": [
+        "SRC_SALES.TRANSACTION_DETAILS.LINE_TOTAL",
+        "SRC_SALES.TRANSACTIONS.CURRENCY_CD"
+      ],
+      "transformation": "IIF(CURRENCY_CD = 'USD', LINE_TOTAL, LINE_TOTAL * :LKP.RETURN(LKP_FX_RATE, CURRENCY_CD, 'USD'))",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "IIF(CURRENCY_CD = 'USD', LINE_TOTAL, LINE_TOTAL * :LKP.RETURN(LKP_FX_RATE, CURRENCY_CD, 'USD'))",
+          "output_column": "O_LINE_TOTAL_USD"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "O_LINE_TOTAL_USD",
+          "output_column": "O_LINE_TOTAL_USD"
+        }
+      ],
+      "notes": "Line total converted to USD using exchange rate lookup"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "DISCOUNT_USD",
+      "source_columns": [
+        "SRC_SALES.TRANSACTIONS.DISCOUNT_AMT",
+        "SRC_SALES.TRANSACTIONS.CURRENCY_CD"
+      ],
+      "transformation": "IIF(CURRENCY_CD = 'USD', DISCOUNT_AMT, DISCOUNT_AMT * :LKP.RETURN(LKP_FX_RATE, CURRENCY_CD, 'USD'))",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "IIF(CURRENCY_CD = 'USD', DISCOUNT_AMT, DISCOUNT_AMT * :LKP.RETURN(LKP_FX_RATE, CURRENCY_CD, 'USD'))",
+          "output_column": "O_DISCOUNT_USD"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "O_DISCOUNT_USD",
+          "output_column": "O_DISCOUNT_USD"
+        }
+      ],
+      "notes": "Discount amount converted to USD using exchange rate lookup"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "TAX_USD",
+      "source_columns": [
+        "SRC_SALES.TRANSACTIONS.TAX_AMT",
+        "SRC_SALES.TRANSACTIONS.CURRENCY_CD"
+      ],
+      "transformation": "IIF(CURRENCY_CD = 'USD', TAX_AMT, TAX_AMT * :LKP.RETURN(LKP_FX_RATE, CURRENCY_CD, 'USD'))",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "IIF(CURRENCY_CD = 'USD', TAX_AMT, TAX_AMT * :LKP.RETURN(LKP_FX_RATE, CURRENCY_CD, 'USD'))",
+          "output_column": "O_TAX_USD"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "O_TAX_USD",
+          "output_column": "O_TAX_USD"
+        }
+      ],
+      "notes": "Tax amount converted to USD using exchange rate lookup"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "NET_AMOUNT_USD",
+      "source_columns": [
+        "SRC_SALES.TRANSACTION_DETAILS.LINE_TOTAL",
+        "SRC_SALES.TRANSACTIONS.DISCOUNT_AMT",
+        "SRC_SALES.TRANSACTIONS.TAX_AMT",
+        "SRC_SALES.TRANSACTIONS.CURRENCY_CD"
+      ],
+      "transformation": "O_LINE_TOTAL_USD - O_DISCOUNT_USD + O_TAX_USD",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "O_LINE_TOTAL_USD - O_DISCOUNT_USD + O_TAX_USD",
+          "output_column": "O_NET_AMOUNT_USD"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "O_NET_AMOUNT_USD",
+          "output_column": "O_NET_AMOUNT_USD"
+        }
+      ],
+      "notes": "Net amount calculated as line total minus discount plus tax, validated to be positive"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "PAYMENT_METHOD",
+      "source_columns": [
+        "SRC_SALES.TRANSACTIONS.PAYMENT_METHOD"
+      ],
+      "transformation": "PAYMENT_METHOD",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "SQ_TRANSACTIONS",
+          "expression": "PAYMENT_METHOD",
+          "output_column": "PAYMENT_METHOD"
+        },
+        {
+          "component_name": "JNR_TXN_DETAILS",
+          "expression": "PAYMENT_METHOD",
+          "output_column": "PAYMENT_METHOD"
+        },
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "PAYMENT_METHOD",
+          "output_column": "PAYMENT_METHOD"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "PAYMENT_METHOD",
+          "output_column": "PAYMENT_METHOD"
+        }
+      ],
+      "notes": "Payment method used for the transaction"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "CHANNEL",
+      "source_columns": [
+        "SRC_SALES.TRANSACTIONS.CHANNEL"
+      ],
+      "transformation": "CHANNEL",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "SQ_TRANSACTIONS",
+          "expression": "CHANNEL",
+          "output_column": "CHANNEL"
+        },
+        {
+          "component_name": "JNR_TXN_DETAILS",
+          "expression": "CHANNEL",
+          "output_column": "CHANNEL"
+        },
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "CHANNEL",
+          "output_column": "CHANNEL"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "CHANNEL",
+          "output_column": "CHANNEL"
+        }
+      ],
+      "notes": "Sales channel for the transaction"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "PRODUCT_CATEGORY",
+      "source_columns": [
+        "REF_DATA.PRODUCT_MASTER.CATEGORY"
+      ],
+      "transformation": "CATEGORY",
+      "transformation_type": "lookup",
+      "intermediate_steps": [
+        {
+          "component_name": "LKP_PRODUCT_MASTER",
+          "expression": "CATEGORY",
+          "output_column": "CATEGORY"
+        },
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "CATEGORY",
+          "output_column": "CATEGORY"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "CATEGORY",
+          "output_column": "CATEGORY"
+        }
+      ],
+      "notes": "Product category from product master dimension"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "STORE_REGION",
+      "source_columns": [
+        "REF_DATA.STORE_MASTER.STORE_REGION"
+      ],
+      "transformation": "STORE_REGION",
+      "transformation_type": "lookup",
+      "intermediate_steps": [
+        {
+          "component_name": "LKP_STORE_MASTER",
+          "expression": "STORE_REGION",
+          "output_column": "STORE_REGION"
+        },
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "STORE_REGION",
+          "output_column": "STORE_REGION"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "STORE_REGION",
+          "output_column": "STORE_REGION"
+        }
+      ],
+      "notes": "Store region from store master dimension"
+    },
+    {
+      "target_table": "DWH.FACT_SALES",
+      "target_column": "MARGIN_BAND",
+      "source_columns": [
+        "REF_DATA.PRODUCT_MASTER.UNIT_PRICE",
+        "REF_DATA.PRODUCT_MASTER.COST_PRICE"
+      ],
+      "transformation": "IIF(MARGIN_PCT >= 50, 'High', IIF(MARGIN_PCT >= 25, 'Medium', IIF(MARGIN_PCT >= 0, 'Low', 'Negative')))",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "LKP_PRODUCT_MASTER",
+          "expression": "(UNIT_PRICE - COST_PRICE) / NULLIF(UNIT_PRICE, 0) * 100",
+          "output_column": "MARGIN_PCT"
+        },
+        {
+          "component_name": "EXP_CURRENCY_CALC",
+          "expression": "IIF(MARGIN_PCT >= 50, 'High', IIF(MARGIN_PCT >= 25, 'Medium', IIF(MARGIN_PCT >= 0, 'Low', 'Negative')))",
+          "output_column": "O_MARGIN_BAND"
+        },
+        {
+          "component_name": "RTR_VALIDATION",
+          "expression": "O_MARGIN_BAND",
+          "output_column": "O_MARGIN_BAND"
+        }
+      ],
+      "notes": "Margin band classification: High (≥50%), Medium (≥25%), Low (≥0%), Negative (<0%)"
+    }
+  ],
+  "data_flow_edges": [
+    {
+      "from_node": "SRC_SALES.TRANSACTIONS",
+      "to_node": "SQ_TRANSACTIONS",
+      "columns": [
+        "TXN_ID",
+        "CUSTOMER_ID",
+        "STORE_ID",
+        "TXN_DATE",
+        "TOTAL_AMT",
+        "DISCOUNT_AMT",
+        "TAX_AMT",
+        "PAYMENT_METHOD",
+        "CHANNEL",
+        "CURRENCY_CD",
+        "TXN_STATUS"
+      ],
+      "edge_label": "filter: TXN_STATUS NOT IN ('CANCELLED', 'FRAUDULENT') AND TXN_DATE >= TRUNC(SYSDATE) - 1"
+    },
+    {
+      "from_node": "SRC_SALES.TRANSACTION_DETAILS",
+      "to_node": "SQ_TRANSACTION_DETAILS",
+      "columns": [
+        "DETAIL_ID",
+        "TXN_ID",
+        "PRODUCT_ID",
+        "QUANTITY",
+        "UNIT_PRICE",
+        "LINE_TOTAL"
+      ],
+      "edge_label": "pass through all transaction detail records"
+    },
+    {
+      "from_node": "SQ_TRANSACTIONS",
+      "to_node": "JNR_TXN_DETAILS",
+      "columns": [
+        "TXN_ID",
+        "CUSTOMER_ID",
+        "STORE_ID",
+        "TXN_DATE",
+        "TOTAL_AMT",
+        "DISCOUNT_AMT",
+        "TAX_AMT",
+        "PAYMENT_METHOD",
+        "CHANNEL",
+        "CURRENCY_CD"
+      ],
+      "edge_label": "inner join on TXN_ID"
+    },
+    {
+      "from_node": "SQ_TRANSACTION_DETAILS",
+      "to_node": "JNR_TXN_DETAILS",
+      "columns": [
+        "DETAIL_ID",
+        "TXN_ID",
+        "PRODUCT_ID",
+        "QUANTITY",
+        "UNIT_PRICE",
+        "LINE_TOTAL"
+      ],
+      "edge_label": "inner join on TXN_ID"
+    },
+    {
+      "from_node": "JNR_TXN_DETAILS",
+      "to_node": "LKP_PRODUCT_MASTER",
+      "columns": [
+        "PRODUCT_ID"
+      ],
+      "edge_label": "lookup product info by PRODUCT_ID"
+    },
+    {
+      "from_node": "JNR_TXN_DETAILS",
+      "to_node": "LKP_STORE_MASTER",
+      "columns": [
+        "STORE_ID"
+      ],
+      "edge_label": "lookup store info by STORE_ID"
+    },
+    {
+      "from_node": "JNR_TXN_DETAILS",
+      "to_node": "EXP_CURRENCY_CALC",
+      "columns": [
+        "TXN_ID",
+        "CUSTOMER_ID",
+        "TXN_DATE",
+        "PRODUCT_ID",
+        "QUANTITY",
+        "UNIT_PRICE",
+        "CURRENCY_CD",
+        "LINE_TOTAL",
+        "DISCOUNT_AMT",
+        "TAX_AMT",
+        "PAYMENT_METHOD",
+        "CHANNEL"
+      ],
+      "edge_label": "pass transaction data for currency conversion"
+    },
+    {
+      "from_node": "LKP_PRODUCT_MASTER",
+      "to_node": "EXP_CURRENCY_CALC",
+      "columns": [
+        "CATEGORY",
+        "MARGIN_PCT"
+      ],
+      "edge_label": "enrich with product category and margin percentage"
+    },
+    {
+      "from_node": "LKP_STORE_MASTER",
+      "to_node": "EXP_CURRENCY_CALC",
+      "columns": [
+        "STORE_SK",
+        "STORE_REGION"
+      ],
+      "edge_label": "enrich with store surrogate key and region"
+    },
+    {
+      "from_node": "EXP_CURRENCY_CALC",
+      "to_node": "RTR_VALIDATION",
+      "columns": [
+        "TXN_ID",
+        "CUSTOMER_ID",
+        "PRODUCT_ID",
+        "STORE_SK",
+        "O_DATE_SK",
+        "QUANTITY",
+        "O_UNIT_PRICE_USD",
+        "O_LINE_TOTAL_USD",
+        "O_DISCOUNT_USD",
+        "O_TAX_USD",
+        "O_NET_AMOUNT_USD",
+        "PAYMENT_METHOD",
+        "CHANNEL",
+        "CATEGORY",
+        "STORE_REGION",
+        "O_MARGIN_BAND"
+      ],
+      "edge_label": "route to validation for data quality checks"
+    },
+    {
+      "from_node": "RTR_VALIDATION",
+      "to_node": "DWH.FACT_SALES",
+      "columns": [
+        "TXN_ID",
+        "CUSTOMER_ID",
+        "PRODUCT_ID",
+        "STORE_SK",
+        "O_DATE_SK",
+        "QUANTITY",
+        "O_UNIT_PRICE_USD",
+        "O_LINE_TOTAL_USD",
+        "O_DISCOUNT_USD",
+        "O_TAX_USD",
+        "O_NET_AMOUNT_USD",
+        "PAYMENT_METHOD",
+        "CHANNEL",
+        "CATEGORY",
+        "STORE_REGION",
+        "O_MARGIN_BAND"
+      ],
+      "edge_label": "valid records: NOT ISNULL(CUSTOMER_ID) AND NOT ISNULL(PRODUCT_ID) AND O_NET_AMOUNT_USD > 0 AND QUANTITY > 0"
+    },
+    {
+      "from_node": "SEQ_SALES_SK",
+      "to_node": "DWH.FACT_SALES",
+      "columns": [
+        "NEXTVAL"
+      ],
+      "edge_label": "generate surrogate key"
+    }
+  ]
+}
