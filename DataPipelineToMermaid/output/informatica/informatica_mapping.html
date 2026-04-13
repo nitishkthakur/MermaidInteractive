@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sales Data Warehouse Load - m_Sales_Fact_Load — Data Lineage</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0; padding: 2rem; background: #fafafa;
+    }
+    h1 { color: #2F5496; margin-bottom: .5rem; }
+    .subtitle { color: #666; margin-bottom: 2rem; }
+    .mermaid { background: #fff; border: 1px solid #ddd; border-radius: 8px;
+               padding: 2rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Sales Data Warehouse Load - m_Sales_Fact_Load</h1>
+  <p class="subtitle">Data Lineage Diagram</p>
+  <div class="mermaid">
+flowchart LR
+    subgraph Sources["📥 Source Tables"]
+        SRC_SALES_TRANSACTIONS["SRC_SALES.TRANSACTIONS&lt;br/>&lt;i>TXN_ID, CUSTOMER_ID, STORE_ID, TXN_DATE, TOTAL_..."]
+        SRC_SALES_TRANSACTION_DETAILS["SRC_SALES.TRANSACTION_DETAILS&lt;br/>&lt;i>DETAIL_ID, TXN_ID, PRODUCT_ID, QUANTITY,..."]
+        REF_DATA_PRODUCT_MASTER["REF_DATA.PRODUCT_MASTER&lt;br/>&lt;i>PRODUCT_ID, PRODUCT_NAME, CATEGORY, COST_PRICE..."]
+        REF_DATA_STORE_MASTER["REF_DATA.STORE_MASTER&lt;br/>&lt;i>STORE_ID, STORE_SK, STORE_REGION, STORE_NAME&lt;/i>"]
+    end
+    subgraph Transforms["⚙️ Transformations"]
+        SQ_TRANSACTIONS[/"SQ_TRANSACTIONS&lt;br/>&lt;i>transformation&lt;/i>"\]
+        SQ_TRANSACTION_DETAILS[/"SQ_TRANSACTION_DETAILS&lt;br/>&lt;i>transformation&lt;/i>"\]
+        JNR_TXN_DETAILS[/"JNR_TXN_DETAILS&lt;br/>&lt;i>transformation&lt;/i>"\]
+        LKP_PRODUCT_MASTER[/"LKP_PRODUCT_MASTER&lt;br/>&lt;i>transformation&lt;/i>"\]
+        LKP_STORE_MASTER[/"LKP_STORE_MASTER&lt;br/>&lt;i>transformation&lt;/i>"\]
+        EXP_CURRENCY_CALC[/"EXP_CURRENCY_CALC&lt;br/>&lt;i>transformation&lt;/i>"\]
+        SEQ_SALES_SK[/"SEQ_SALES_SK&lt;br/>&lt;i>transformation&lt;/i>"\]
+        RTR_VALIDATION[/"RTR_VALIDATION&lt;br/>&lt;i>transformation&lt;/i>"\]
+    end
+    subgraph Targets["📤 Target Tables"]
+        DWH_FACT_SALES["DWH.FACT_SALES&lt;br/>&lt;i>SALES_SK, TXN_ID, CUSTOMER_ID, PRODUCT_ID, STORE_SK, DA..."]
+    end
+    SRC_SALES_TRANSACTIONS -->|"filter: TXN_STATUS NOT IN ('CANCELLED', 'FRAUDU..."| SQ_TRANSACTIONS
+    SRC_SALES_TRANSACTION_DETAILS -->|"pass through all transaction detail records"| SQ_TRANSACTION_DETAILS
+    SQ_TRANSACTIONS -->|"inner join on TXN_ID"| JNR_TXN_DETAILS
+    SQ_TRANSACTION_DETAILS -->|"inner join on TXN_ID"| JNR_TXN_DETAILS
+    JNR_TXN_DETAILS -->|"lookup product info by PRODUCT_ID"| LKP_PRODUCT_MASTER
+    JNR_TXN_DETAILS -->|"lookup store info by STORE_ID"| LKP_STORE_MASTER
+    JNR_TXN_DETAILS -->|"pass transaction data for currency conversion"| EXP_CURRENCY_CALC
+    LKP_PRODUCT_MASTER -->|"enrich with product category and margin percentage"| EXP_CURRENCY_CALC
+    LKP_STORE_MASTER -->|"enrich with store surrogate key and region"| EXP_CURRENCY_CALC
+    EXP_CURRENCY_CALC -->|"route to validation for data quality checks"| RTR_VALIDATION
+    RTR_VALIDATION -->|"valid records: NOT ISNULL(CUSTOMER_ID) AND NOT ..."| DWH_FACT_SALES
+    SEQ_SALES_SK -->|"generate surrogate key"| DWH_FACT_SALES
+
+    classDef source fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef target fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef transform fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    class SRC_SALES_TRANSACTIONS source
+    class SRC_SALES_TRANSACTION_DETAILS source
+    class REF_DATA_PRODUCT_MASTER source
+    class REF_DATA_STORE_MASTER source
+    class DWH_FACT_SALES target
+    class SQ_TRANSACTIONS transform
+    class SQ_TRANSACTION_DETAILS transform
+    class JNR_TXN_DETAILS transform
+    class LKP_PRODUCT_MASTER transform
+    class LKP_STORE_MASTER transform
+    class EXP_CURRENCY_CALC transform
+    class SEQ_SALES_SK transform
+    class RTR_VALIDATION transform
+  </div>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default',
+    flowchart: { curve: 'basis', useMaxWidth: false } });</script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Order Management & Reporting ETL Pipeline — Data Lineage</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0; padding: 2rem; background: #fafafa;
+    }
+    h1 { color: #2F5496; margin-bottom: .5rem; }
+    .subtitle { color: #666; margin-bottom: 2rem; }
+    .mermaid { background: #fff; border: 1px solid #ddd; border-radius: 8px;
+               padding: 2rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Order Management & Reporting ETL Pipeline</h1>
+  <p class="subtitle">Data Lineage Diagram</p>
+  <div class="mermaid">
+flowchart LR
+    subgraph Sources["📥 Source Tables"]
+        dbo_Orders["dbo.Orders&lt;br/>&lt;i>order_id, customer_id, order_date, status, channel, payme....."]
+        dbo_OrderItems["dbo.OrderItems&lt;br/>&lt;i>item_id, order_id, product_id, quantity, unit_price, di..."]
+        dbo_Customers["dbo.Customers&lt;br/>&lt;i>customer_id, first_name, last_name, email, state, signup..."]
+        dbo_Products["dbo.Products&lt;br/>&lt;i>product_id, product_name, category, sku, cost_price&lt;/i>"]
+        dbo_Inventory["dbo.Inventory&lt;br/>&lt;i>product_id, warehouse_id, quantity_on_hand, quantity_res..."]
+        dbo_TaxRates["dbo.TaxRates&lt;br/>&lt;i>state, tax_rate&lt;/i>"]
+        dbo_CustomerAddresses["dbo.CustomerAddresses&lt;br/>&lt;i>customer_id, address_type, region&lt;/i>"]
+        dbo_ShippingProviders["dbo.ShippingProviders&lt;br/>&lt;i>provider_name, avg_delivery_days&lt;/i>"]
+        dbo_Promotions["dbo.Promotions&lt;br/>&lt;i>product_id, discount_pct, is_active, start_date, end_da..."]
+        staging_RawOrderFeed["staging.RawOrderFeed&lt;br/>&lt;i>raw_id, email, sku, qty, price, order_date_text, ..."]
+    end
+    subgraph Transforms["⚙️ Transformations"]
+        usp_RefreshOrderSummary{"usp_RefreshOrderSummary&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        temp_table_DailyCalc[/"temp_table_DailyCalc&lt;br/>&lt;i>temp_table&lt;/i>"\]
+        usp_CalculateDailyRevenue{"usp_CalculateDailyRevenue&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        temp_table_LTV_Calc[/"temp_table_LTV_Calc&lt;br/>&lt;i>temp_table&lt;/i>"\]
+        usp_UpdateCustomerLTV{"usp_UpdateCustomerLTV&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        subquery_sales_30d{"subquery_sales_30d&lt;br/>&lt;i>subquery&lt;/i>"}
+        usp_SnapshotInventory{"usp_SnapshotInventory&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        table_variable_PendingOrders[/"table_variable_PendingOrders&lt;br/>&lt;i>temp_table&lt;/i>"\]
+        usp_ProcessShippingQueue{"usp_ProcessShippingQueue&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        subquery_returns{"subquery_returns&lt;br/>&lt;i>subquery&lt;/i>"}
+        usp_RevenueByProduct{"usp_RevenueByProduct&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        temp_table_KPI_Current[/"temp_table_KPI_Current&lt;br/>&lt;i>temp_table&lt;/i>"\]
+        usp_MonthlyKPIDashboard{"usp_MonthlyKPIDashboard&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        usp_StageIncomingOrders{"usp_StageIncomingOrders&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        usp_PromoteStaging{"usp_PromoteStaging&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        cte_CustomerBase{"cte_CustomerBase&lt;br/>&lt;i>CTE&lt;/i>"}
+        cte_OrderMetrics{"cte_OrderMetrics&lt;br/>&lt;i>CTE&lt;/i>"}
+        cte_EngagementScore{"cte_EngagementScore&lt;br/>&lt;i>CTE&lt;/i>"}
+        usp_GenerateCustomerScorecard{"usp_GenerateCustomerScorecard&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        usp_NightlyETLOrchestrator{"usp_NightlyETLOrchestrator&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+        usp_CleanupOldData{"usp_CleanupOldData&lt;br/>&lt;i>stored_procedure&lt;/i>"}
+    end
+    subgraph Targets["📤 Target Tables"]
+        dbo_OrderSummary["dbo.OrderSummary&lt;br/>&lt;i>order_id, customer_id, customer_name, customer_email,..."]
+        dbo_DailyRevenue["dbo.DailyRevenue&lt;br/>&lt;i>report_date, region, channel, order_count, revenue, a..."]
+        dbo_CustomerLifetimeValue["dbo.CustomerLifetimeValue&lt;br/>&lt;i>customer_id, total_orders, total_spend, avg_..."]
+        dbo_InventorySnapshot["dbo.InventorySnapshot&lt;br/>&lt;i>snapshot_date, product_id, product_name, categor..."]
+        dbo_AuditLog["dbo.AuditLog&lt;br/>&lt;i>proc_name, status, row_count, exec_timestamp, error_msg, ..."]
+        dbo_ShippingQueue["dbo.ShippingQueue&lt;br/>&lt;i>order_id, customer_id, shipping_method, region, gran..."]
+        dbo_RevenueByProduct["dbo.RevenueByProduct&lt;br/>&lt;i>report_start, report_end, product_id, product_nam..."]
+        dbo_MonthlyKPI["dbo.MonthlyKPI&lt;br/>&lt;i>kpi_month, total_revenue, total_orders, avg_order_value..."]
+        staging_OrderStaging["staging.OrderStaging&lt;br/>&lt;i>batch_id, raw_order_id, customer_email, product_s..."]
+        dbo_CustomerScorecard["dbo.CustomerScorecard&lt;br/>&lt;i>customer_id, customer_name, email, signup_date, ..."]
+        archive_Orders["archive.Orders&lt;br/>&lt;i>order_id, customer_id, order_date, status, archived_at&lt;/i>"]
+    end
+    dbo_Orders -->|"filter: order_date BETWEEN @StartDate AND @EndD..."| usp_RefreshOrderSummary
+    dbo_Customers -->|"inner join on customer_id"| usp_RefreshOrderSummary
+    dbo_OrderItems -->|"inner join on order_id"| usp_RefreshOrderSummary
+    dbo_TaxRates -->|"left join on customer state"| usp_RefreshOrderSummary
+    dbo_CustomerAddresses -->|"left join on customer_id AND address_type = 'sh..."| usp_RefreshOrderSummary
+    dbo_ShippingProviders -->|"left join on shipping_method = provider_name"| usp_RefreshOrderSummary
+    usp_RefreshOrderSummary -->|"delete existing + insert new for date range"| dbo_OrderSummary
+    dbo_OrderSummary -->|"filter: order_date = @ReportDate"| temp_table_DailyCalc
+    dbo_Orders -->|"inner join on order_id"| temp_table_DailyCalc
+    dbo_Customers -->|"inner join on customer_id"| temp_table_DailyCalc
+    dbo_CustomerAddresses -->|"left join on customer_id AND address_type = 'bi..."| temp_table_DailyCalc
+    temp_table_DailyCalc -->|"merge on report_date, region, channel"| dbo_DailyRevenue
+    dbo_Customers -->|"base customer list"| temp_table_LTV_Calc
+    dbo_Orders -->|"inner join on customer_id, filter: status &lt;> 'c..."| temp_table_LTV_Calc
+    dbo_OrderSummary -->|"inner join on order_id"| temp_table_LTV_Calc
+    temp_table_LTV_Calc -->|"merge on customer_id"| dbo_CustomerLifetimeValue
+    dbo_Inventory -->|"base inventory data"| usp_SnapshotInventory
+    dbo_Products -->|"inner join on product_id"| usp_SnapshotInventory
+    dbo_OrderItems -->|"sales velocity calculation"| subquery_sales_30d
+    dbo_Orders -->|"inner join on order_id, filter: order_date >= D..."| subquery_sales_30d
+    subquery_sales_30d -->|"left join on product_id for days of supply calc..."| usp_SnapshotInventory
+    usp_SnapshotInventory -->|"insert snapshot records"| dbo_InventorySnapshot
+    dbo_OrderSummary -->|"filter: order_status = 'confirmed' AND not in s..."| table_variable_PendingOrders
+    dbo_CustomerLifetimeValue -->|"left join on customer_id for tier assignment"| table_variable_PendingOrders
+    dbo_ShippingQueue -->|"NOT EXISTS check to exclude already queued orders"| table_variable_PendingOrders
+    table_variable_PendingOrders -->|"insert ordered by priority_score DESC"| dbo_ShippingQueue
+    dbo_OrderItems -->|"base order item data"| usp_RevenueByProduct
+    dbo_Orders -->|"inner join on order_id, filter: order_date BETW..."| usp_RevenueByProduct
+    dbo_Products -->|"inner join on product_id"| usp_RevenueByProduct
+    dbo_OrderItems -->|"return calculations"| subquery_returns
+    dbo_Orders -->|"inner join on order_id, filter: status = 'retur..."| subquery_returns
+    subquery_returns -->|"left join on product_id for net revenue calcula..."| usp_RevenueByProduct
+    usp_RevenueByProduct -->|"delete existing + insert new for period"| dbo_RevenueByProduct
+    dbo_DailyRevenue -->|"filter: report_date BETWEEN @MonthStart AND @Mo..."| temp_table_KPI_Current
+    dbo_Orders -->|"subqueries for active and returning customer co..."| temp_table_KPI_Current
+    temp_table_KPI_Current -->|"merge on kpi_month"| dbo_MonthlyKPI
+    staging_RawOrderFeed -->|"filter: processed = 0"| usp_StageIncomingOrders
+    usp_StageIncomingOrders -->|"insert with validation and cleansing"| staging_OrderStaging
+    staging_OrderStaging -->|"filter: batch_id = @BatchId AND is_valid = 1"| usp_PromoteStaging
+    dbo_Customers -->|"inner join on email for customer matching"| usp_PromoteStaging
+    dbo_Products -->|"inner join on sku for product matching"| usp_PromoteStaging
+    dbo_Promotions -->|"left join for discount calculation"| usp_PromoteStaging
+    usp_PromoteStaging -->|"insert new orders from staging"| dbo_Orders
+    usp_PromoteStaging -->|"insert order items from staging"| dbo_OrderItems
+    dbo_Customers -->|"filter: status = 'active' AND (@CustomerId IS N..."| cte_CustomerBase
+    cte_CustomerBase -->|"base for order aggregation"| cte_OrderMetrics
+    dbo_Orders -->|"left join on customer_id, filter: status NOT IN..."| cte_OrderMetrics
+    dbo_OrderSummary -->|"left join on order_id"| cte_OrderMetrics
+    cte_CustomerBase -->|"base for engagement calculation"| cte_EngagementScore
+    cte_OrderMetrics -->|"left join on customer_id"| cte_EngagementScore
+    dbo_CustomerLifetimeValue -->|"left join on customer_id"| cte_EngagementScore
+    cte_CustomerBase -->|"base customer data"| usp_GenerateCustomerScorecard
+    cte_OrderMetrics -->|"left join on customer_id"| usp_GenerateCustomerScorecard
+    dbo_CustomerLifetimeValue -->|"left join on customer_id"| usp_GenerateCustomerScorecard
+    cte_EngagementScore -->|"left join on customer_id"| usp_GenerateCustomerScorecard
+    usp_GenerateCustomerScorecard -->|"merge on customer_id"| dbo_CustomerScorecard
+    dbo_Orders -->|"filter: order_date &lt; @CutoffDate AND status IN ..."| usp_CleanupOldData
+    dbo_OrderItems -->|"inner join with orders for deletion"| usp_CleanupOldData
+    usp_CleanupOldData -->|"archive old completed orders"| archive_Orders
+    dbo_AuditLog -->|"delete: exec_timestamp &lt; DATEADD(DAY, -365, GET..."| usp_CleanupOldData
+    dbo_InventorySnapshot -->|"delete: snapshot_date &lt; DATEADD(MONTH, -6, GETD..."| usp_CleanupOldData
+
+    classDef source fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef target fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef transform fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    class dbo_Orders source
+    class dbo_OrderItems source
+    class dbo_Customers source
+    class dbo_Products source
+    class dbo_Inventory source
+    class dbo_TaxRates source
+    class dbo_CustomerAddresses source
+    class dbo_ShippingProviders source
+    class dbo_Promotions source
+    class staging_RawOrderFeed source
+    class dbo_OrderSummary target
+    class dbo_DailyRevenue target
+    class dbo_CustomerLifetimeValue target
+    class dbo_InventorySnapshot target
+    class dbo_AuditLog target
+    class dbo_ShippingQueue target
+    class dbo_RevenueByProduct target
+    class dbo_MonthlyKPI target
+    class staging_OrderStaging target
+    class dbo_CustomerScorecard target
+    class archive_Orders target
+    class usp_RefreshOrderSummary transform
+    class temp_table_DailyCalc transform
+    class usp_CalculateDailyRevenue transform
+    class temp_table_LTV_Calc transform
+    class usp_UpdateCustomerLTV transform
+    class subquery_sales_30d transform
+    class usp_SnapshotInventory transform
+    class table_variable_PendingOrders transform
+    class usp_ProcessShippingQueue transform
+    class subquery_returns transform
+    class usp_RevenueByProduct transform
+    class temp_table_KPI_Current transform
+    class usp_MonthlyKPIDashboard transform
+    class usp_StageIncomingOrders transform
+    class usp_PromoteStaging transform
+    class cte_CustomerBase transform
+    class cte_OrderMetrics transform
+    class cte_EngagementScore transform
+    class usp_GenerateCustomerScorecard transform
+    class usp_NightlyETLOrchestrator transform
+    class usp_CleanupOldData transform
+  </div>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default',
+    flowchart: { curve: 'basis', useMaxWidth: false } });</script>
+</body>
+</html>

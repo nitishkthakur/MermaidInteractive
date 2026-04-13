@@ -1,0 +1,2020 @@
+{
+  "pipeline_name": "customer_order_analytics",
+  "pipeline_type": "abinitio",
+  "source_file": "DataPipelineToMermaid/test_fixtures/abinitio_graph.mp",
+  "description": "Customer Order Analytics Pipeline reads from Oracle source tables (sales.orders and crm.customers) and a CSV flat file (order_items.csv), performs currency conversion lookups to standardize amounts to USD, enriches product data with hierarchy and margin information, filters for valid orders and items, joins orders with customer demographics and order line items, aggregates metrics by customer (revenue, order count, product diversity), assigns customer tier based on revenue and order thresholds, calculates engagement scores, deduplicates by customer, and writes the final customer analytics summary to PostgreSQL analytics table and a CSV export file.",
+  "sources": [
+    {
+      "schema_name": "sales",
+      "table_name": "orders",
+      "columns": [
+        {
+          "name": "order_id",
+          "data_type": "integer",
+          "description": "Unique identifier for each order"
+        },
+        {
+          "name": "customer_id",
+          "data_type": "integer",
+          "description": "Foreign key linking to customer"
+        },
+        {
+          "name": "order_date",
+          "data_type": "date",
+          "description": "Date the order was placed"
+        },
+        {
+          "name": "total_amount",
+          "data_type": "decimal(12,2)",
+          "description": "Total order amount before discount and tax in original currency"
+        },
+        {
+          "name": "discount_amount",
+          "data_type": "decimal(10,2)",
+          "description": "Discount applied to the order in original currency"
+        },
+        {
+          "name": "tax_amount",
+          "data_type": "decimal(10,2)",
+          "description": "Tax amount for the order in original currency"
+        },
+        {
+          "name": "shipping_cost",
+          "data_type": "decimal(8,2)",
+          "description": "Shipping cost for the order"
+        },
+        {
+          "name": "payment_method",
+          "data_type": "string(30)",
+          "description": "Payment method used (e.g., credit card, PayPal)"
+        },
+        {
+          "name": "order_status",
+          "data_type": "string(20)",
+          "description": "Current status of the order (confirmed, shipped, delivered, etc.)"
+        },
+        {
+          "name": "channel",
+          "data_type": "string(20)",
+          "description": "Sales channel (online, retail, wholesale, etc.)"
+        },
+        {
+          "name": "currency",
+          "data_type": "string(3)",
+          "description": "ISO currency code (USD, EUR, GBP, etc.)"
+        },
+        {
+          "name": "store_id",
+          "data_type": "integer",
+          "description": "Store identifier if applicable, nullable for online orders"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "crm",
+      "table_name": "customers",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "integer",
+          "description": "Unique customer identifier"
+        },
+        {
+          "name": "first_name",
+          "data_type": "string(100)",
+          "description": "Customer first name"
+        },
+        {
+          "name": "last_name",
+          "data_type": "string(100)",
+          "description": "Customer last name"
+        },
+        {
+          "name": "email",
+          "data_type": "string(255)",
+          "description": "Customer email address"
+        },
+        {
+          "name": "signup_date",
+          "data_type": "date",
+          "description": "Date customer signed up"
+        },
+        {
+          "name": "country",
+          "data_type": "string(50)",
+          "description": "Customer country"
+        },
+        {
+          "name": "region",
+          "data_type": "string(50)",
+          "description": "Customer region or state"
+        },
+        {
+          "name": "segment",
+          "data_type": "string(30)",
+          "description": "Customer segment classification"
+        },
+        {
+          "name": "is_active",
+          "data_type": "integer",
+          "description": "Flag indicating if customer is active (1=active, 0=inactive)"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "",
+      "table_name": "order_items.csv",
+      "columns": [
+        {
+          "name": "item_id",
+          "data_type": "integer",
+          "description": "Unique identifier for each order line item"
+        },
+        {
+          "name": "order_id",
+          "data_type": "integer",
+          "description": "Foreign key linking to order"
+        },
+        {
+          "name": "product_id",
+          "data_type": "integer",
+          "description": "Product identifier"
+        },
+        {
+          "name": "product_name",
+          "data_type": "string(200)",
+          "description": "Product name"
+        },
+        {
+          "name": "category",
+          "data_type": "string(100)",
+          "description": "Product category"
+        },
+        {
+          "name": "quantity",
+          "data_type": "integer",
+          "description": "Quantity ordered"
+        },
+        {
+          "name": "unit_price",
+          "data_type": "decimal(10,2)",
+          "description": "Price per unit"
+        },
+        {
+          "name": "line_total",
+          "data_type": "decimal(12,2)",
+          "description": "Total for this line item (quantity * unit_price)"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "",
+      "table_name": "exchange_rates.dat",
+      "columns": [
+        {
+          "name": "currency_code",
+          "data_type": "string(3)",
+          "description": "ISO currency code (lookup key)"
+        },
+        {
+          "name": "usd_rate",
+          "data_type": "decimal(10,6)",
+          "description": "Exchange rate to USD"
+        },
+        {
+          "name": "rate_date",
+          "data_type": "date",
+          "description": "Date of the exchange rate"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "",
+      "table_name": "product_hierarchy.dat",
+      "columns": [
+        {
+          "name": "product_id",
+          "data_type": "integer",
+          "description": "Product identifier (lookup key)"
+        },
+        {
+          "name": "department",
+          "data_type": "string(100)",
+          "description": "Product department"
+        },
+        {
+          "name": "sub_category",
+          "data_type": "string(100)",
+          "description": "Product sub-category"
+        },
+        {
+          "name": "brand",
+          "data_type": "string(100)",
+          "description": "Product brand"
+        },
+        {
+          "name": "is_private_label",
+          "data_type": "integer",
+          "description": "Flag indicating if product is private label"
+        },
+        {
+          "name": "margin_pct",
+          "data_type": "decimal(5,2)",
+          "description": "Product margin percentage"
+        }
+      ],
+      "table_type": "source"
+    }
+  ],
+  "targets": [
+    {
+      "schema_name": "analytics",
+      "table_name": "customer_daily_summary",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "integer",
+          "description": "Unique customer identifier"
+        },
+        {
+          "name": "customer_name",
+          "data_type": "string(201)",
+          "description": "Full customer name (first + last)"
+        },
+        {
+          "name": "email",
+          "data_type": "string(255)",
+          "description": "Customer email address"
+        },
+        {
+          "name": "country",
+          "data_type": "string(50)",
+          "description": "Customer country"
+        },
+        {
+          "name": "region",
+          "data_type": "string(50)",
+          "description": "Customer region"
+        },
+        {
+          "name": "segment",
+          "data_type": "string(30)",
+          "description": "Customer segment"
+        },
+        {
+          "name": "total_orders",
+          "data_type": "integer",
+          "description": "Count of distinct orders for customer"
+        },
+        {
+          "name": "total_items",
+          "data_type": "integer",
+          "description": "Total quantity of items ordered"
+        },
+        {
+          "name": "gross_revenue",
+          "data_type": "decimal(14,2)",
+          "description": "Total revenue in USD before discount"
+        },
+        {
+          "name": "total_discount",
+          "data_type": "decimal(12,2)",
+          "description": "Total discount amount in USD"
+        },
+        {
+          "name": "total_tax",
+          "data_type": "decimal(12,2)",
+          "description": "Total tax amount in USD"
+        },
+        {
+          "name": "net_revenue",
+          "data_type": "decimal(14,2)",
+          "description": "Net revenue in USD (total - discount + tax)"
+        },
+        {
+          "name": "avg_order_value",
+          "data_type": "decimal(10,2)",
+          "description": "Average order value in USD"
+        },
+        {
+          "name": "max_order_value",
+          "data_type": "decimal(12,2)",
+          "description": "Maximum order value in USD"
+        },
+        {
+          "name": "distinct_products",
+          "data_type": "integer",
+          "description": "Count of distinct products purchased"
+        },
+        {
+          "name": "top_category",
+          "data_type": "string(100)",
+          "description": "Most frequently purchased category"
+        },
+        {
+          "name": "top_brand",
+          "data_type": "string(100)",
+          "description": "Most frequently purchased brand"
+        },
+        {
+          "name": "total_margin",
+          "data_type": "decimal(12,2)",
+          "description": "Total estimated margin in USD"
+        },
+        {
+          "name": "margin_pct",
+          "data_type": "decimal(5,2)",
+          "description": "Margin percentage (total_margin / gross_revenue * 100)"
+        },
+        {
+          "name": "customer_tier",
+          "data_type": "string(20)",
+          "description": "Customer tier: Platinum (≥$50K & ≥50 orders), Gold (≥$20K & ≥20), Silver (≥$5K & ≥5), Bronze (all others)"
+        },
+        {
+          "name": "engagement_score",
+          "data_type": "integer",
+          "description": "Composite engagement score based on order frequency, product diversity, tenure, and margin"
+        },
+        {
+          "name": "first_order_date",
+          "data_type": "date",
+          "description": "Date of customer's first order"
+        },
+        {
+          "name": "last_order_date",
+          "data_type": "date",
+          "description": "Date of customer's most recent order"
+        },
+        {
+          "name": "etl_date",
+          "data_type": "date",
+          "description": "Date the ETL pipeline ran"
+        }
+      ],
+      "table_type": "target"
+    },
+    {
+      "schema_name": "",
+      "table_name": "customer_summary_${DATA_DATE}.csv",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "integer",
+          "description": "Unique customer identifier"
+        },
+        {
+          "name": "customer_name",
+          "data_type": "string",
+          "description": "Full customer name"
+        },
+        {
+          "name": "region",
+          "data_type": "string",
+          "description": "Customer region"
+        },
+        {
+          "name": "customer_tier",
+          "data_type": "string",
+          "description": "Customer tier classification"
+        },
+        {
+          "name": "total_orders",
+          "data_type": "integer",
+          "description": "Count of distinct orders"
+        },
+        {
+          "name": "net_revenue",
+          "data_type": "decimal",
+          "description": "Net revenue in USD"
+        },
+        {
+          "name": "engagement_score",
+          "data_type": "integer",
+          "description": "Engagement score"
+        },
+        {
+          "name": "etl_date",
+          "data_type": "date",
+          "description": "Date the ETL pipeline ran"
+        }
+      ],
+      "table_type": "target"
+    }
+  ],
+  "components": [
+    {
+      "name": "read_orders",
+      "component_type": "abinitio_component",
+      "description": "Reads orders from Oracle sales.orders table. Filters to orders placed on the specified DATA_DATE and excludes cancelled and fraudulent orders. This is the primary source for order-level transaction data.",
+      "input_tables": [
+        "sales.orders"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "order_status",
+        "channel",
+        "currency",
+        "store_id"
+      ],
+      "sql_text": "SELECT order_id, customer_id, order_date, total_amount, discount_amount, tax_amount, shipping_cost, payment_method, order_status, channel, currency, store_id FROM sales.orders WHERE order_date = TO_DATE('${DATA_DATE}', 'YYYYMMDD') AND order_status NOT IN ('cancelled', 'fraudulent')"
+    },
+    {
+      "name": "read_customers",
+      "component_type": "abinitio_component",
+      "description": "Reads customer master data from Oracle crm.customers table. Filters to active customers only (is_active = 1). Provides customer demographics and segmentation information.",
+      "input_tables": [
+        "crm.customers"
+      ],
+      "output_columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "signup_date",
+        "country",
+        "region",
+        "segment",
+        "is_active"
+      ],
+      "sql_text": "SELECT customer_id, first_name, last_name, email, signup_date, country, region, segment, is_active FROM crm.customers WHERE is_active = 1"
+    },
+    {
+      "name": "read_order_items",
+      "component_type": "abinitio_component",
+      "description": "Reads order line items from CSV flat file. Each record represents a product within an order with quantity and pricing information.",
+      "input_tables": [
+        "order_items.csv"
+      ],
+      "output_columns": [
+        "item_id",
+        "order_id",
+        "product_id",
+        "product_name",
+        "category",
+        "quantity",
+        "unit_price",
+        "line_total"
+      ],
+      "sql_text": "Read from /data/feeds/${DATA_DATE}/order_items.csv with delimiter=comma, header=true"
+    },
+    {
+      "name": "lookup_exchange_rates",
+      "component_type": "abinitio_component",
+      "description": "Enriches orders with currency exchange rates. Looks up the USD exchange rate for each order's currency and calculates USD-equivalent amounts for total, discount, tax, and net amounts. This standardizes all monetary values to USD for consistent reporting.",
+      "input_tables": [
+        "read_orders.out0",
+        "exchange_rates.dat"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "order_status",
+        "channel",
+        "currency",
+        "store_id",
+        "usd_rate",
+        "amount_usd",
+        "discount_usd",
+        "tax_usd",
+        "net_amount_usd"
+      ],
+      "sql_text": "Lookup exchange_rates.dat on currency_code; out.amount_usd = in.total_amount * lookup(in.currency).usd_rate; out.discount_usd = in.discount_amount * lookup(in.currency).usd_rate; out.tax_usd = in.tax_amount * lookup(in.currency).usd_rate; out.net_amount_usd = (in.total_amount - in.discount_amount + in.tax_amount) * lookup(in.currency).usd_rate"
+    },
+    {
+      "name": "lookup_product_hierarchy",
+      "component_type": "abinitio_component",
+      "description": "Enriches order items with product hierarchy and margin data. Looks up department, sub-category, brand, private label flag, and margin percentage for each product. Calculates estimated margin in USD for each line item.",
+      "input_tables": [
+        "read_order_items.out0",
+        "product_hierarchy.dat"
+      ],
+      "output_columns": [
+        "item_id",
+        "order_id",
+        "product_id",
+        "product_name",
+        "category",
+        "quantity",
+        "unit_price",
+        "line_total",
+        "department",
+        "sub_category",
+        "brand",
+        "is_private_label",
+        "margin_pct",
+        "estimated_margin"
+      ],
+      "sql_text": "Lookup product_hierarchy.dat on product_id; out.estimated_margin = in.line_total * lookup(in.product_id).margin_pct / 100"
+    },
+    {
+      "name": "filter_valid_orders",
+      "component_type": "abinitio_component",
+      "description": "Filters orders to include only valid transactions: amount_usd > 0 (positive value), order_status in confirmed/shipped/delivered (completed orders), and customer_id is not null. Rejects orders that fail these criteria.",
+      "input_tables": [
+        "lookup_exchange_rates.out0"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "order_status",
+        "channel",
+        "currency",
+        "store_id",
+        "usd_rate",
+        "amount_usd",
+        "discount_usd",
+        "tax_usd",
+        "net_amount_usd"
+      ],
+      "sql_text": "WHERE in.amount_usd > 0 AND in.order_status IN ('confirmed', 'shipped', 'delivered') AND in.customer_id IS NOT NULL"
+    },
+    {
+      "name": "filter_high_value_items",
+      "component_type": "abinitio_component",
+      "description": "Filters order items to include only valid line items: quantity > 0 and unit_price > 0. Removes zero-quantity or zero-price items.",
+      "input_tables": [
+        "lookup_product_hierarchy.out0"
+      ],
+      "output_columns": [
+        "item_id",
+        "order_id",
+        "product_id",
+        "product_name",
+        "category",
+        "quantity",
+        "unit_price",
+        "line_total",
+        "department",
+        "sub_category",
+        "brand",
+        "is_private_label",
+        "margin_pct",
+        "estimated_margin"
+      ],
+      "sql_text": "WHERE in.quantity > 0 AND in.unit_price > 0"
+    },
+    {
+      "name": "join_order_customer",
+      "component_type": "abinitio_component",
+      "description": "Inner join of filtered orders with customer master data on customer_id. Enriches each order with customer demographics (name, email, country, region, segment) and calculates days since customer signup. This creates an order-customer view.",
+      "input_tables": [
+        "filter_valid_orders.out_accepted",
+        "read_customers.out0"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "order_date",
+        "amount_usd",
+        "discount_usd",
+        "tax_usd",
+        "net_amount_usd",
+        "payment_method",
+        "channel",
+        "store_id",
+        "days_since_signup"
+      ],
+      "sql_text": "INNER JOIN on customer_id; out.customer_name = string_concat(right.first_name, ' ', right.last_name); out.days_since_signup = date_difference(right.signup_date, left.order_date, 'days')"
+    },
+    {
+      "name": "join_order_items",
+      "component_type": "abinitio_component",
+      "description": "Left outer join of order-customer view with filtered order items on order_id. Preserves all orders even if they have no line items. Combines order-level metrics with product-level details (product name, category, department, brand, quantity, pricing, margin).",
+      "input_tables": [
+        "join_order_customer.out0",
+        "filter_high_value_items.out_accepted"
+      ],
+      "output_columns": [
+        "order_id",
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "order_date",
+        "amount_usd",
+        "discount_usd",
+        "tax_usd",
+        "net_amount_usd",
+        "payment_method",
+        "channel",
+        "store_id",
+        "days_since_signup",
+        "product_id",
+        "product_name",
+        "category",
+        "department",
+        "sub_category",
+        "brand",
+        "quantity",
+        "unit_price",
+        "line_total",
+        "estimated_margin"
+      ],
+      "sql_text": "LEFT OUTER JOIN on order_id; all left columns passed through, right columns (product details) included"
+    },
+    {
+      "name": "rollup_by_customer",
+      "component_type": "abinitio_component",
+      "description": "Aggregates order and item data by customer_id. Calculates key customer metrics: total_orders (distinct count), total_items (sum of quantities), gross_revenue, discounts, taxes, net_revenue (all in USD), average/max order values, distinct product count, top category/brand (mode), total margin, margin percentage, first/last order dates, and days since signup. Groups all transactions for each customer into a single summary row.",
+      "input_tables": [
+        "join_order_items.out0"
+      ],
+      "output_columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "total_orders",
+        "total_items",
+        "gross_revenue",
+        "total_discount",
+        "total_tax",
+        "net_revenue",
+        "avg_order_value",
+        "max_order_value",
+        "distinct_products",
+        "top_category",
+        "top_brand",
+        "total_margin",
+        "margin_pct",
+        "first_order_date",
+        "last_order_date",
+        "days_since_signup"
+      ],
+      "sql_text": "GROUP BY customer_id; out.total_orders = count_distinct(in.order_id); out.total_items = sum(in.quantity); out.gross_revenue = sum(in.amount_usd); out.total_discount = sum(in.discount_usd); out.total_tax = sum(in.tax_usd); out.net_revenue = sum(in.net_amount_usd); out.avg_order_value = mean(in.amount_usd); out.max_order_value = max(in.amount_usd); out.distinct_products = count_distinct(in.product_id); out.top_category = mode(in.category); out.top_brand = mode(in.brand); out.total_margin = sum(in.estimated_margin); out.margin_pct = sum(in.estimated_margin) / if_null(sum(in.amount_usd), 1) * 100; out.first_order_date = min(in.order_date); out.last_order_date = max(in.order_date); out.days_since_signup = first(in.days_since_signup)"
+    },
+    {
+      "name": "assign_customer_tier",
+      "component_type": "abinitio_component",
+      "description": "Assigns customer tier and engagement score based on aggregated metrics. Tier assignment: Platinum (net_revenue >= $50K AND total_orders >= 50), Gold (net_revenue >= $20K AND total_orders >= 20), Silver (net_revenue >= $5K AND total_orders >= 5), Bronze (all others). Engagement score is composite: 30/20/10 points for order frequency (>=20/>=10/else), 20/10/5 for product diversity (>=15/>=5/else), 25/15/10 for tenure (>=365/>=180/else days), 25/15/5 for margin (>=30%/>=15%/else). Adds ETL run date.",
+      "input_tables": [
+        "rollup_by_customer.out0"
+      ],
+      "output_columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "total_orders",
+        "total_items",
+        "gross_revenue",
+        "total_discount",
+        "total_tax",
+        "net_revenue",
+        "avg_order_value",
+        "max_order_value",
+        "distinct_products",
+        "top_category",
+        "top_brand",
+        "total_margin",
+        "margin_pct",
+        "first_order_date",
+        "last_order_date",
+        "days_since_signup",
+        "customer_tier",
+        "engagement_score",
+        "etl_date"
+      ],
+      "sql_text": "out.customer_tier = IF in.net_revenue >= 50000 AND in.total_orders >= 50 THEN 'Platinum' ELSE IF in.net_revenue >= 20000 AND in.total_orders >= 20 THEN 'Gold' ELSE IF in.net_revenue >= 5000 AND in.total_orders >= 5 THEN 'Silver' ELSE 'Bronze'; out.engagement_score = (IF in.total_orders >= 20 THEN 30 ELSE IF in.total_orders >= 10 THEN 20 ELSE 10) + (IF in.distinct_products >= 15 THEN 20 ELSE IF in.distinct_products >= 5 THEN 10 ELSE 5) + (IF in.days_since_signup >= 365 THEN 25 ELSE IF in.days_since_signup >= 180 THEN 15 ELSE 10) + (IF in.margin_pct >= 30 THEN 25 ELSE IF in.margin_pct >= 15 THEN 15 ELSE 5); out.etl_date = today()"
+    },
+    {
+      "name": "dedup_customers",
+      "component_type": "abinitio_component",
+      "description": "Deduplicates customer records by customer_id, keeping the first occurrence. Ensures one row per customer in the output. Separates unique records from duplicates.",
+      "input_tables": [
+        "assign_customer_tier.out0"
+      ],
+      "output_columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "total_orders",
+        "total_items",
+        "gross_revenue",
+        "total_discount",
+        "total_tax",
+        "net_revenue",
+        "avg_order_value",
+        "max_order_value",
+        "distinct_products",
+        "top_category",
+        "top_brand",
+        "total_margin",
+        "margin_pct",
+        "first_order_date",
+        "last_order_date",
+        "days_since_signup",
+        "customer_tier",
+        "engagement_score",
+        "etl_date"
+      ],
+      "sql_text": "DEDUP on customer_id, keep first"
+    },
+    {
+      "name": "partition_output",
+      "component_type": "abinitio_component",
+      "description": "Partitions deduplicated customer records using round-robin distribution across 4 partitions (controlled by $PARALLELISM parameter). Enables parallel writing to target systems.",
+      "input_tables": [
+        "dedup_customers.out_unique"
+      ],
+      "output_columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "total_orders",
+        "total_items",
+        "gross_revenue",
+        "total_discount",
+        "total_tax",
+        "net_revenue",
+        "avg_order_value",
+        "max_order_value",
+        "distinct_products",
+        "top_category",
+        "top_brand",
+        "total_margin",
+        "margin_pct",
+        "first_order_date",
+        "last_order_date",
+        "days_since_signup",
+        "customer_tier",
+        "engagement_score",
+        "etl_date"
+      ],
+      "sql_text": "Partition by round-robin into 4 partitions"
+    },
+    {
+      "name": "write_customer_analytics",
+      "component_type": "abinitio_component",
+      "description": "Writes customer analytics summary to PostgreSQL analytics.customer_daily_summary table using merge mode on (customer_id, etl_date). This allows incremental updates of customer metrics by date. Target table contains all customer metrics, tier, and engagement score.",
+      "input_tables": [
+        "partition_output.out0"
+      ],
+      "output_columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "total_orders",
+        "total_items",
+        "gross_revenue",
+        "total_discount",
+        "total_tax",
+        "net_revenue",
+        "avg_order_value",
+        "max_order_value",
+        "distinct_products",
+        "top_category",
+        "top_brand",
+        "total_margin",
+        "margin_pct",
+        "customer_tier",
+        "engagement_score",
+        "first_order_date",
+        "last_order_date",
+        "etl_date"
+      ],
+      "sql_text": "MERGE INTO analytics.customer_daily_summary ON (customer_id, etl_date)"
+    },
+    {
+      "name": "write_summary_file",
+      "component_type": "abinitio_component",
+      "description": "Writes a subset of customer analytics to CSV file for distribution. Includes customer_id, name, region, tier, order count, net revenue, engagement score, and ETL date. Provides a simplified summary for business users.",
+      "input_tables": [
+        "dedup_customers.out_unique"
+      ],
+      "output_columns": [
+        "customer_id",
+        "customer_name",
+        "region",
+        "customer_tier",
+        "total_orders",
+        "net_revenue",
+        "engagement_score",
+        "etl_date"
+      ],
+      "sql_text": "Write to /data/output/${DATA_DATE}/customer_summary_${DATA_DATE}.csv as delimited CSV with header"
+    }
+  ],
+  "column_lineage": [
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "customer_id",
+      "source_columns": [
+        "sales.orders.customer_id"
+      ],
+      "transformation": "sales.orders.customer_id",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "read_orders",
+          "expression": "sales.orders.customer_id",
+          "output_column": "customer_id"
+        },
+        {
+          "component_name": "lookup_exchange_rates",
+          "expression": "in.customer_id",
+          "output_column": "customer_id"
+        },
+        {
+          "component_name": "filter_valid_orders",
+          "expression": "in.customer_id",
+          "output_column": "customer_id"
+        },
+        {
+          "component_name": "join_order_customer",
+          "expression": "left.customer_id",
+          "output_column": "customer_id"
+        },
+        {
+          "component_name": "join_order_items",
+          "expression": "left.customer_id",
+          "output_column": "customer_id"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "in.customer_id",
+          "output_column": "customer_id"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.customer_id",
+          "output_column": "customer_id"
+        },
+        {
+          "component_name": "dedup_customers",
+          "expression": "in.customer_id",
+          "output_column": "customer_id"
+        }
+      ],
+      "notes": "Primary key for customer analytics; flows unchanged through entire pipeline"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "customer_name",
+      "source_columns": [
+        "crm.customers.first_name",
+        "crm.customers.last_name"
+      ],
+      "transformation": "string_concat(crm.customers.first_name, ' ', crm.customers.last_name)",
+      "transformation_type": "concatenation",
+      "intermediate_steps": [
+        {
+          "component_name": "join_order_customer",
+          "expression": "string_concat(right.first_name, ' ', right.last_name)",
+          "output_column": "customer_name"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "first(in.customer_name)",
+          "output_column": "customer_name"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.customer_name",
+          "output_column": "customer_name"
+        }
+      ],
+      "notes": "Concatenates first and last name from customer master; aggregated using first() function in rollup"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "email",
+      "source_columns": [
+        "crm.customers.email"
+      ],
+      "transformation": "crm.customers.email",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "join_order_customer",
+          "expression": "right.email",
+          "output_column": "email"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "first(in.email)",
+          "output_column": "email"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.email",
+          "output_column": "email"
+        }
+      ],
+      "notes": "Customer email from CRM; aggregated using first() function"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "country",
+      "source_columns": [
+        "crm.customers.country"
+      ],
+      "transformation": "crm.customers.country",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "join_order_customer",
+          "expression": "right.country",
+          "output_column": "country"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "first(in.country)",
+          "output_column": "country"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.country",
+          "output_column": "country"
+        }
+      ],
+      "notes": "Customer country from CRM; aggregated using first() function"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "region",
+      "source_columns": [
+        "crm.customers.region"
+      ],
+      "transformation": "crm.customers.region",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "join_order_customer",
+          "expression": "right.region",
+          "output_column": "region"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "first(in.region)",
+          "output_column": "region"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.region",
+          "output_column": "region"
+        }
+      ],
+      "notes": "Customer region from CRM; aggregated using first() function"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "segment",
+      "source_columns": [
+        "crm.customers.segment"
+      ],
+      "transformation": "crm.customers.segment",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "join_order_customer",
+          "expression": "right.segment",
+          "output_column": "segment"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "first(in.segment)",
+          "output_column": "segment"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.segment",
+          "output_column": "segment"
+        }
+      ],
+      "notes": "Customer segment classification from CRM; aggregated using first() function"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "total_orders",
+      "source_columns": [
+        "sales.orders.order_id"
+      ],
+      "transformation": "count_distinct(sales.orders.order_id)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "count_distinct(in.order_id)",
+          "output_column": "total_orders"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.total_orders",
+          "output_column": "total_orders"
+        }
+      ],
+      "notes": "Count of distinct orders per customer; used in tier assignment logic (Platinum >=50, Gold >=20, Silver >=5)"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "total_items",
+      "source_columns": [
+        "order_items.csv.quantity"
+      ],
+      "transformation": "sum(order_items.csv.quantity)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "sum(in.quantity)",
+          "output_column": "total_items"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.total_items",
+          "output_column": "total_items"
+        }
+      ],
+      "notes": "Total quantity of items ordered across all orders"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "gross_revenue",
+      "source_columns": [
+        "sales.orders.total_amount",
+        "exchange_rates.dat.usd_rate"
+      ],
+      "transformation": "sum(sales.orders.total_amount * exchange_rates.dat.usd_rate)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "lookup_exchange_rates",
+          "expression": "in.total_amount * lookup(in.currency).usd_rate",
+          "output_column": "amount_usd"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "sum(in.amount_usd)",
+          "output_column": "gross_revenue"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.gross_revenue",
+          "output_column": "gross_revenue"
+        }
+      ],
+      "notes": "Total order amount in USD before discount; converted from original currency using exchange rate lookup"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "total_discount",
+      "source_columns": [
+        "sales.orders.discount_amount",
+        "exchange_rates.dat.usd_rate"
+      ],
+      "transformation": "sum(sales.orders.discount_amount * exchange_rates.dat.usd_rate)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "lookup_exchange_rates",
+          "expression": "in.discount_amount * lookup(in.currency).usd_rate",
+          "output_column": "discount_usd"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "sum(in.discount_usd)",
+          "output_column": "total_discount"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.total_discount",
+          "output_column": "total_discount"
+        }
+      ],
+      "notes": "Total discount amount in USD; converted from original currency"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "total_tax",
+      "source_columns": [
+        "sales.orders.tax_amount",
+        "exchange_rates.dat.usd_rate"
+      ],
+      "transformation": "sum(sales.orders.tax_amount * exchange_rates.dat.usd_rate)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "lookup_exchange_rates",
+          "expression": "in.tax_amount * lookup(in.currency).usd_rate",
+          "output_column": "tax_usd"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "sum(in.tax_usd)",
+          "output_column": "total_tax"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.total_tax",
+          "output_column": "total_tax"
+        }
+      ],
+      "notes": "Total tax amount in USD; converted from original currency"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "net_revenue",
+      "source_columns": [
+        "sales.orders.total_amount",
+        "sales.orders.discount_amount",
+        "sales.orders.tax_amount",
+        "exchange_rates.dat.usd_rate"
+      ],
+      "transformation": "sum((sales.orders.total_amount - sales.orders.discount_amount + sales.orders.tax_amount) * exchange_rates.dat.usd_rate)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "lookup_exchange_rates",
+          "expression": "(in.total_amount - in.discount_amount + in.tax_amount) * lookup(in.currency).usd_rate",
+          "output_column": "net_amount_usd"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "sum(in.net_amount_usd)",
+          "output_column": "net_revenue"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.net_revenue",
+          "output_column": "net_revenue"
+        }
+      ],
+      "notes": "Net revenue in USD (total - discount + tax); key metric for tier assignment (Platinum >=50000, Gold >=20000, Silver >=5000)"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "avg_order_value",
+      "source_columns": [
+        "sales.orders.total_amount",
+        "exchange_rates.dat.usd_rate"
+      ],
+      "transformation": "mean(sales.orders.total_amount * exchange_rates.dat.usd_rate)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "lookup_exchange_rates",
+          "expression": "in.total_amount * lookup(in.currency).usd_rate",
+          "output_column": "amount_usd"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "mean(in.amount_usd)",
+          "output_column": "avg_order_value"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.avg_order_value",
+          "output_column": "avg_order_value"
+        }
+      ],
+      "notes": "Average order value in USD across all customer orders"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "max_order_value",
+      "source_columns": [
+        "sales.orders.total_amount",
+        "exchange_rates.dat.usd_rate"
+      ],
+      "transformation": "max(sales.orders.total_amount * exchange_rates.dat.usd_rate)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "lookup_exchange_rates",
+          "expression": "in.total_amount * lookup(in.currency).usd_rate",
+          "output_column": "amount_usd"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "max(in.amount_usd)",
+          "output_column": "max_order_value"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.max_order_value",
+          "output_column": "max_order_value"
+        }
+      ],
+      "notes": "Maximum order value in USD for the customer"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "distinct_products",
+      "source_columns": [
+        "order_items.csv.product_id"
+      ],
+      "transformation": "count_distinct(order_items.csv.product_id)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "count_distinct(in.product_id)",
+          "output_column": "distinct_products"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.distinct_products",
+          "output_column": "distinct_products"
+        }
+      ],
+      "notes": "Count of distinct products purchased; used in engagement score (>=15 pts=20, >=5 pts=10, else 5)"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "top_category",
+      "source_columns": [
+        "order_items.csv.category"
+      ],
+      "transformation": "mode(order_items.csv.category)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "mode(in.category)",
+          "output_column": "top_category"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.top_category",
+          "output_column": "top_category"
+        }
+      ],
+      "notes": "Most frequently purchased product category"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "top_brand",
+      "source_columns": [
+        "product_hierarchy.dat.brand"
+      ],
+      "transformation": "mode(product_hierarchy.dat.brand)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "lookup_product_hierarchy",
+          "expression": "lookup(in.product_id).brand",
+          "output_column": "brand"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "mode(in.brand)",
+          "output_column": "top_brand"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.top_brand",
+          "output_column": "top_brand"
+        }
+      ],
+      "notes": "Most frequently purchased brand"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "total_margin",
+      "source_columns": [
+        "order_items.csv.line_total",
+        "product_hierarchy.dat.margin_pct"
+      ],
+      "transformation": "sum(order_items.csv.line_total * product_hierarchy.dat.margin_pct / 100)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "lookup_product_hierarchy",
+          "expression": "in.line_total * lookup(in.product_id).margin_pct / 100",
+          "output_column": "estimated_margin"
+        },
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "sum(in.estimated_margin)",
+          "output_column": "total_margin"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.total_margin",
+          "output_column": "total_margin"
+        }
+      ],
+      "notes": "Total estimated margin in USD across all customer purchases"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "margin_pct",
+      "source_columns": [
+        "order_items.csv.line_total",
+        "product_hierarchy.dat.margin_pct",
+        "sales.orders.total_amount",
+        "exchange_rates.dat.usd_rate"
+      ],
+      "transformation": "sum(order_items.csv.line_total * product_hierarchy.dat.margin_pct / 100) / sum(sales.orders.total_amount * exchange_rates.dat.usd_rate) * 100",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "sum(in.estimated_margin) / if_null(sum(in.amount_usd), 1) * 100",
+          "output_column": "margin_pct"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.margin_pct",
+          "output_column": "margin_pct"
+        }
+      ],
+      "notes": "Margin percentage (total_margin / gross_revenue * 100); used in engagement score (>=30% pts=25, >=15% pts=15, else 5)"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "first_order_date",
+      "source_columns": [
+        "sales.orders.order_date"
+      ],
+      "transformation": "min(sales.orders.order_date)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "min(in.order_date)",
+          "output_column": "first_order_date"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.first_order_date",
+          "output_column": "first_order_date"
+        }
+      ],
+      "notes": "Date of customer's first order"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "last_order_date",
+      "source_columns": [
+        "sales.orders.order_date"
+      ],
+      "transformation": "max(sales.orders.order_date)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "rollup_by_customer",
+          "expression": "max(in.order_date)",
+          "output_column": "last_order_date"
+        },
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "in.last_order_date",
+          "output_column": "last_order_date"
+        }
+      ],
+      "notes": "Date of customer's most recent order"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "customer_tier",
+      "source_columns": [
+        "rollup_by_customer.net_revenue",
+        "rollup_by_customer.total_orders"
+      ],
+      "transformation": "IF net_revenue >= 50000 AND total_orders >= 50 THEN 'Platinum' ELSE IF net_revenue >= 20000 AND total_orders >= 20 THEN 'Gold' ELSE IF net_revenue >= 5000 AND total_orders >= 5 THEN 'Silver' ELSE 'Bronze'",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "IF in.net_revenue >= 50000 AND in.total_orders >= 50 THEN 'Platinum' ELSE IF in.net_revenue >= 20000 AND in.total_orders >= 20 THEN 'Gold' ELSE IF in.net_revenue >= 5000 AND in.total_orders >= 5 THEN 'Silver' ELSE 'Bronze'",
+          "output_column": "customer_tier"
+        }
+      ],
+      "notes": "Customer tier assignment based on net revenue and order count thresholds: Platinum (>=50K & >=50 orders), Gold (>=20K & >=20), Silver (>=5K & >=5), Bronze (all others)"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "engagement_score",
+      "source_columns": [
+        "rollup_by_customer.total_orders",
+        "rollup_by_customer.distinct_products",
+        "rollup_by_customer.days_since_signup",
+        "rollup_by_customer.margin_pct"
+      ],
+      "transformation": "(IF total_orders >= 20 THEN 30 ELSE IF total_orders >= 10 THEN 20 ELSE 10) + (IF distinct_products >= 15 THEN 20 ELSE IF distinct_products >= 5 THEN 10 ELSE 5) + (IF days_since_signup >= 365 THEN 25 ELSE IF days_since_signup >= 180 THEN 15 ELSE 10) + (IF margin_pct >= 30 THEN 25 ELSE IF margin_pct >= 15 THEN 15 ELSE 5)",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "(IF in.total_orders >= 20 THEN 30 ELSE IF in.total_orders >= 10 THEN 20 ELSE 10) + (IF in.distinct_products >= 15 THEN 20 ELSE IF in.distinct_products >= 5 THEN 10 ELSE 5) + (IF in.days_since_signup >= 365 THEN 25 ELSE IF in.days_since_signup >= 180 THEN 15 ELSE 10) + (IF in.margin_pct >= 30 THEN 25 ELSE IF in.margin_pct >= 15 THEN 15 ELSE 5)",
+          "output_column": "engagement_score"
+        }
+      ],
+      "notes": "Composite engagement score (0-100 scale): Order frequency (30/20/10 pts for >=20/>=10/else), Product diversity (20/10/5 pts for >=15/>=5/else), Tenure (25/15/10 pts for >=365/>=180/else days), Margin contribution (25/15/5 pts for >=30%/>=15%/else)"
+    },
+    {
+      "target_table": "analytics.customer_daily_summary",
+      "target_column": "etl_date",
+      "source_columns": [],
+      "transformation": "today()",
+      "transformation_type": "constant",
+      "intermediate_steps": [
+        {
+          "component_name": "assign_customer_tier",
+          "expression": "today()",
+          "output_column": "etl_date"
+        }
+      ],
+      "notes": "ETL run date; used as part of merge key in target table"
+    },
+    {
+      "target_table": "customer_summary_${DATA_DATE}.csv",
+      "target_column": "customer_id",
+      "source_columns": [
+        "sales.orders.customer_id"
+      ],
+      "transformation": "sales.orders.customer_id",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "dedup_customers",
+          "expression": "in.customer_id",
+          "output_column": "customer_id"
+        }
+      ],
+      "notes": "Customer ID for CSV export"
+    },
+    {
+      "target_table": "customer_summary_${DATA_DATE}.csv",
+      "target_column": "customer_name",
+      "source_columns": [
+        "crm.customers.first_name",
+        "crm.customers.last_name"
+      ],
+      "transformation": "string_concat(crm.customers.first_name, ' ', crm.customers.last_name)",
+      "transformation_type": "concatenation",
+      "intermediate_steps": [
+        {
+          "component_name": "dedup_customers",
+          "expression": "in.customer_name",
+          "output_column": "customer_name"
+        }
+      ],
+      "notes": "Full customer name for CSV export"
+    },
+    {
+      "target_table": "customer_summary_${DATA_DATE}.csv",
+      "target_column": "region",
+      "source_columns": [
+        "crm.customers.region"
+      ],
+      "transformation": "crm.customers.region",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "dedup_customers",
+          "expression": "in.region",
+          "output_column": "region"
+        }
+      ],
+      "notes": "Customer region for CSV export"
+    },
+    {
+      "target_table": "customer_summary_${DATA_DATE}.csv",
+      "target_column": "customer_tier",
+      "source_columns": [
+        "rollup_by_customer.net_revenue",
+        "rollup_by_customer.total_orders"
+      ],
+      "transformation": "IF net_revenue >= 50000 AND total_orders >= 50 THEN 'Platinum' ELSE IF net_revenue >= 20000 AND total_orders >= 20 THEN 'Gold' ELSE IF net_revenue >= 5000 AND total_orders >= 5 THEN 'Silver' ELSE 'Bronze'",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "dedup_customers",
+          "expression": "in.customer_tier",
+          "output_column": "customer_tier"
+        }
+      ],
+      "notes": "Customer tier for CSV export"
+    },
+    {
+      "target_table": "customer_summary_${DATA_DATE}.csv",
+      "target_column": "total_orders",
+      "source_columns": [
+        "sales.orders.order_id"
+      ],
+      "transformation": "count_distinct(sales.orders.order_id)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "dedup_customers",
+          "expression": "in.total_orders",
+          "output_column": "total_orders"
+        }
+      ],
+      "notes": "Order count for CSV export"
+    },
+    {
+      "target_table": "customer_summary_${DATA_DATE}.csv",
+      "target_column": "net_revenue",
+      "source_columns": [
+        "sales.orders.total_amount",
+        "sales.orders.discount_amount",
+        "sales.orders.tax_amount",
+        "exchange_rates.dat.usd_rate"
+      ],
+      "transformation": "sum((sales.orders.total_amount - sales.orders.discount_amount + sales.orders.tax_amount) * exchange_rates.dat.usd_rate)",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "dedup_customers",
+          "expression": "in.net_revenue",
+          "output_column": "net_revenue"
+        }
+      ],
+      "notes": "Net revenue in USD for CSV export"
+    },
+    {
+      "target_table": "customer_summary_${DATA_DATE}.csv",
+      "target_column": "engagement_score",
+      "source_columns": [
+        "rollup_by_customer.total_orders",
+        "rollup_by_customer.distinct_products",
+        "rollup_by_customer.days_since_signup",
+        "rollup_by_customer.margin_pct"
+      ],
+      "transformation": "(IF total_orders >= 20 THEN 30 ELSE IF total_orders >= 10 THEN 20 ELSE 10) + (IF distinct_products >= 15 THEN 20 ELSE IF distinct_products >= 5 THEN 10 ELSE 5) + (IF days_since_signup >= 365 THEN 25 ELSE IF days_since_signup >= 180 THEN 15 ELSE 10) + (IF margin_pct >= 30 THEN 25 ELSE IF margin_pct >= 15 THEN 15 ELSE 5)",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "dedup_customers",
+          "expression": "in.engagement_score",
+          "output_column": "engagement_score"
+        }
+      ],
+      "notes": "Engagement score for CSV export"
+    },
+    {
+      "target_table": "customer_summary_${DATA_DATE}.csv",
+      "target_column": "etl_date",
+      "source_columns": [],
+      "transformation": "today()",
+      "transformation_type": "constant",
+      "intermediate_steps": [
+        {
+          "component_name": "dedup_customers",
+          "expression": "in.etl_date",
+          "output_column": "etl_date"
+        }
+      ],
+      "notes": "ETL run date for CSV export"
+    }
+  ],
+  "data_flow_edges": [
+    {
+      "from_node": "sales.orders",
+      "to_node": "read_orders",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "order_status",
+        "channel",
+        "currency",
+        "store_id"
+      ],
+      "edge_label": "read from Oracle; filter: order_date = ${DATA_DATE} AND order_status NOT IN ('cancelled', 'fraudulent')"
+    },
+    {
+      "from_node": "crm.customers",
+      "to_node": "read_customers",
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "signup_date",
+        "country",
+        "region",
+        "segment",
+        "is_active"
+      ],
+      "edge_label": "read from Oracle; filter: is_active = 1"
+    },
+    {
+      "from_node": "order_items.csv",
+      "to_node": "read_order_items",
+      "columns": [
+        "item_id",
+        "order_id",
+        "product_id",
+        "product_name",
+        "category",
+        "quantity",
+        "unit_price",
+        "line_total"
+      ],
+      "edge_label": "read from CSV file"
+    },
+    {
+      "from_node": "read_orders",
+      "to_node": "lookup_exchange_rates",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "order_status",
+        "channel",
+        "currency",
+        "store_id"
+      ],
+      "edge_label": "lookup exchange_rates.dat on currency_code; enrich with usd_rate and calculate USD amounts"
+    },
+    {
+      "from_node": "exchange_rates.dat",
+      "to_node": "lookup_exchange_rates",
+      "columns": [
+        "currency_code",
+        "usd_rate",
+        "rate_date"
+      ],
+      "edge_label": "lookup reference data"
+    },
+    {
+      "from_node": "read_order_items",
+      "to_node": "lookup_product_hierarchy",
+      "columns": [
+        "item_id",
+        "order_id",
+        "product_id",
+        "product_name",
+        "category",
+        "quantity",
+        "unit_price",
+        "line_total"
+      ],
+      "edge_label": "lookup product_hierarchy.dat on product_id; enrich with department, brand, margin"
+    },
+    {
+      "from_node": "product_hierarchy.dat",
+      "to_node": "lookup_product_hierarchy",
+      "columns": [
+        "product_id",
+        "department",
+        "sub_category",
+        "brand",
+        "is_private_label",
+        "margin_pct"
+      ],
+      "edge_label": "lookup reference data"
+    },
+    {
+      "from_node": "lookup_exchange_rates",
+      "to_node": "filter_valid_orders",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "order_status",
+        "channel",
+        "currency",
+        "store_id",
+        "usd_rate",
+        "amount_usd",
+        "discount_usd",
+        "tax_usd",
+        "net_amount_usd"
+      ],
+      "edge_label": "filter: amount_usd > 0 AND order_status IN ('confirmed', 'shipped', 'delivered') AND customer_id IS NOT NULL"
+    },
+    {
+      "from_node": "lookup_product_hierarchy",
+      "to_node": "filter_high_value_items",
+      "columns": [
+        "item_id",
+        "order_id",
+        "product_id",
+        "product_name",
+        "category",
+        "quantity",
+        "unit_price",
+        "line_total",
+        "department",
+        "sub_category",
+        "brand",
+        "is_private_label",
+        "margin_pct",
+        "estimated_margin"
+      ],
+      "edge_label": "filter: quantity > 0 AND unit_price > 0"
+    },
+    {
+      "from_node": "filter_valid_orders",
+      "to_node": "join_order_customer",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "total_amount",
+        "discount_amount",
+        "tax_amount",
+        "shipping_cost",
+        "payment_method",
+        "order_status",
+        "channel",
+        "currency",
+        "store_id",
+        "usd_rate",
+        "amount_usd",
+        "discount_usd",
+        "tax_usd",
+        "net_amount_usd"
+      ],
+      "edge_label": "left side of inner join on customer_id"
+    },
+    {
+      "from_node": "read_customers",
+      "to_node": "join_order_customer",
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "signup_date",
+        "country",
+        "region",
+        "segment",
+        "is_active"
+      ],
+      "edge_label": "right side of inner join on customer_id; enrich orders with customer demographics"
+    },
+    {
+      "from_node": "join_order_customer",
+      "to_node": "join_order_items",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "order_date",
+        "amount_usd",
+        "discount_usd",
+        "tax_usd",
+        "net_amount_usd",
+        "payment_method",
+        "channel",
+        "store_id",
+        "days_since_signup"
+      ],
+      "edge_label": "left side of left outer join on order_id"
+    },
+    {
+      "from_node": "filter_high_value_items",
+      "to_node": "join_order_items",
+      "columns": [
+        "item_id",
+        "order_id",
+        "product_id",
+        "product_name",
+        "category",
+        "quantity",
+        "unit_price",
+        "line_total",
+        "department",
+        "sub_category",
+        "brand",
+        "is_private_label",
+        "margin_pct",
+        "estimated_margin"
+      ],
+      "edge_label": "right side of left outer join on order_id; add product details to orders"
+    },
+    {
+      "from_node": "join_order_items",
+      "to_node": "rollup_by_customer",
+      "columns": [
+        "order_id",
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "order_date",
+        "amount_usd",
+        "discount_usd",
+        "tax_usd",
+        "net_amount_usd",
+        "payment_method",
+        "channel",
+        "store_id",
+        "days_since_signup",
+        "product_id",
+        "product_name",
+        "category",
+        "department",
+        "sub_category",
+        "brand",
+        "quantity",
+        "unit_price",
+        "line_total",
+        "estimated_margin"
+      ],
+      "edge_label": "aggregate by customer_id; calculate metrics: total_orders, total_items, revenue, discount, tax, margin, product diversity"
+    },
+    {
+      "from_node": "rollup_by_customer",
+      "to_node": "assign_customer_tier",
+      "columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "total_orders",
+        "total_items",
+        "gross_revenue",
+        "total_discount",
+        "total_tax",
+        "net_revenue",
+        "avg_order_value",
+        "max_order_value",
+        "distinct_products",
+        "top_category",
+        "top_brand",
+        "total_margin",
+        "margin_pct",
+        "first_order_date",
+        "last_order_date",
+        "days_since_signup"
+      ],
+      "edge_label": "assign tier and engagement score based on revenue/order thresholds and engagement metrics"
+    },
+    {
+      "from_node": "assign_customer_tier",
+      "to_node": "dedup_customers",
+      "columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "total_orders",
+        "total_items",
+        "gross_revenue",
+        "total_discount",
+        "total_tax",
+        "net_revenue",
+        "avg_order_value",
+        "max_order_value",
+        "distinct_products",
+        "top_category",
+        "top_brand",
+        "total_margin",
+        "margin_pct",
+        "first_order_date",
+        "last_order_date",
+        "days_since_signup",
+        "customer_tier",
+        "engagement_score",
+        "etl_date"
+      ],
+      "edge_label": "dedup on customer_id, keep first"
+    },
+    {
+      "from_node": "dedup_customers",
+      "to_node": "partition_output",
+      "columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "total_orders",
+        "total_items",
+        "gross_revenue",
+        "total_discount",
+        "total_tax",
+        "net_revenue",
+        "avg_order_value",
+        "max_order_value",
+        "distinct_products",
+        "top_category",
+        "top_brand",
+        "total_margin",
+        "margin_pct",
+        "first_order_date",
+        "last_order_date",
+        "days_since_signup",
+        "customer_tier",
+        "engagement_score",
+        "etl_date"
+      ],
+      "edge_label": "partition by round-robin into 4 partitions for parallel write"
+    },
+    {
+      "from_node": "partition_output",
+      "to_node": "write_customer_analytics",
+      "columns": [
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "region",
+        "segment",
+        "total_orders",
+        "total_items",
+        "gross_revenue",
+        "total_discount",
+        "total_tax",
+        "net_revenue",
+        "avg_order_value",
+        "max_order_value",
+        "distinct_products",
+        "top_category",
+        "top_brand",
+        "total_margin",
+        "margin_pct",
+        "first_order_date",
+        "last_order_date",
+        "days_since_signup",
+        "customer_tier",
+        "engagement_score",
+        "etl_date"
+      ],
+      "edge_label": "merge into analytics.customer_daily_summary on (customer_id, etl_date)"
+    },
+    {
+      "from_node": "dedup_customers",
+      "to_node": "write_summary_file",
+      "columns": [
+        "customer_id",
+        "customer_name",
+        "region",
+        "customer_tier",
+        "total_orders",
+        "net_revenue",
+        "engagement_score",
+        "etl_date"
+      ],
+      "edge_label": "write subset to CSV file for distribution"
+    }
+  ]
+}

@@ -1,0 +1,2061 @@
+{
+  "pipeline_name": "Customer 360 Analytics ETL Pipeline",
+  "pipeline_type": "sql_query",
+  "source_file": "DataPipelineToMermaid/test_fixtures/complex_sql_20_ctes.sql",
+  "description": "A comprehensive customer analytics pipeline that processes raw transactional, web engagement, shipping, and promotional data to create a unified customer 360-degree view. The pipeline calculates customer lifetime value, RFM segmentation, tier assignments, cross-sell recommendations, and engagement metrics for business intelligence and marketing analytics.",
+  "sources": [
+    {
+      "schema_name": "raw",
+      "table_name": "customers",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "int",
+          "description": "Unique customer identifier"
+        },
+        {
+          "name": "first_name",
+          "data_type": "varchar",
+          "description": "Customer first name"
+        },
+        {
+          "name": "last_name",
+          "data_type": "varchar",
+          "description": "Customer last name"
+        },
+        {
+          "name": "email",
+          "data_type": "varchar",
+          "description": "Customer email address"
+        },
+        {
+          "name": "phone",
+          "data_type": "varchar",
+          "description": "Customer phone number"
+        },
+        {
+          "name": "country",
+          "data_type": "varchar",
+          "description": "Customer country"
+        },
+        {
+          "name": "state",
+          "data_type": "varchar",
+          "description": "Customer state/province"
+        },
+        {
+          "name": "city",
+          "data_type": "varchar",
+          "description": "Customer city"
+        },
+        {
+          "name": "signup_date",
+          "data_type": "date",
+          "description": "Date customer signed up"
+        },
+        {
+          "name": "date_of_birth",
+          "data_type": "date",
+          "description": "Customer birth date"
+        },
+        {
+          "name": "status",
+          "data_type": "varchar",
+          "description": "Customer account status (active, trial, inactive)"
+        },
+        {
+          "name": "preferred_currency",
+          "data_type": "varchar",
+          "description": "Customer's preferred currency"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "raw",
+      "table_name": "transactions",
+      "columns": [
+        {
+          "name": "transaction_id",
+          "data_type": "int",
+          "description": "Unique transaction identifier"
+        },
+        {
+          "name": "customer_id",
+          "data_type": "int",
+          "description": "Customer who made the transaction"
+        },
+        {
+          "name": "product_id",
+          "data_type": "int",
+          "description": "Product purchased"
+        },
+        {
+          "name": "order_date",
+          "data_type": "date",
+          "description": "Date of the order"
+        },
+        {
+          "name": "quantity",
+          "data_type": "int",
+          "description": "Quantity purchased"
+        },
+        {
+          "name": "unit_price_local",
+          "data_type": "decimal",
+          "description": "Unit price in local currency"
+        },
+        {
+          "name": "currency",
+          "data_type": "varchar",
+          "description": "Transaction currency"
+        },
+        {
+          "name": "discount_amount",
+          "data_type": "decimal",
+          "description": "Discount applied"
+        },
+        {
+          "name": "tax_amount",
+          "data_type": "decimal",
+          "description": "Tax amount"
+        },
+        {
+          "name": "payment_method",
+          "data_type": "varchar",
+          "description": "Payment method used"
+        },
+        {
+          "name": "channel",
+          "data_type": "varchar",
+          "description": "Sales channel (web, mobile, store, phone)"
+        },
+        {
+          "name": "store_id",
+          "data_type": "int",
+          "description": "Store identifier for offline transactions"
+        },
+        {
+          "name": "status",
+          "data_type": "varchar",
+          "description": "Transaction status"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "raw",
+      "table_name": "products",
+      "columns": [
+        {
+          "name": "product_id",
+          "data_type": "int",
+          "description": "Unique product identifier"
+        },
+        {
+          "name": "product_name",
+          "data_type": "varchar",
+          "description": "Product name"
+        },
+        {
+          "name": "sku",
+          "data_type": "varchar",
+          "description": "Stock keeping unit"
+        },
+        {
+          "name": "unit_price",
+          "data_type": "decimal",
+          "description": "Product unit price"
+        },
+        {
+          "name": "cost_price",
+          "data_type": "decimal",
+          "description": "Product cost price"
+        },
+        {
+          "name": "category_id",
+          "data_type": "int",
+          "description": "Product category identifier"
+        },
+        {
+          "name": "launch_date",
+          "data_type": "date",
+          "description": "Product launch date"
+        },
+        {
+          "name": "weight_kg",
+          "data_type": "decimal",
+          "description": "Product weight in kilograms"
+        },
+        {
+          "name": "is_digital",
+          "data_type": "bit",
+          "description": "Whether product is digital"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "raw",
+      "table_name": "product_categories",
+      "columns": [
+        {
+          "name": "category_id",
+          "data_type": "int",
+          "description": "Unique category identifier"
+        },
+        {
+          "name": "category_name",
+          "data_type": "varchar",
+          "description": "Category name"
+        },
+        {
+          "name": "parent_category_id",
+          "data_type": "int",
+          "description": "Parent category for hierarchy"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "raw",
+      "table_name": "exchange_rates",
+      "columns": [
+        {
+          "name": "from_currency",
+          "data_type": "varchar",
+          "description": "Source currency code"
+        },
+        {
+          "name": "to_currency",
+          "data_type": "varchar",
+          "description": "Target currency code"
+        },
+        {
+          "name": "rate",
+          "data_type": "decimal",
+          "description": "Exchange rate"
+        },
+        {
+          "name": "rate_date",
+          "data_type": "date",
+          "description": "Date of exchange rate"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "raw",
+      "table_name": "web_events",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "int",
+          "description": "Customer who performed the event"
+        },
+        {
+          "name": "session_id",
+          "data_type": "varchar",
+          "description": "Web session identifier"
+        },
+        {
+          "name": "event_type",
+          "data_type": "varchar",
+          "description": "Type of web event (page_view, add_to_cart, search, wishlist)"
+        },
+        {
+          "name": "event_timestamp",
+          "data_type": "datetime",
+          "description": "When the event occurred"
+        },
+        {
+          "name": "time_on_page_seconds",
+          "data_type": "int",
+          "description": "Time spent on page in seconds"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "raw",
+      "table_name": "returns",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "int",
+          "description": "Customer who returned the product"
+        },
+        {
+          "name": "product_id",
+          "data_type": "int",
+          "description": "Product that was returned"
+        },
+        {
+          "name": "return_date",
+          "data_type": "date",
+          "description": "Date of return"
+        },
+        {
+          "name": "refund_amount",
+          "data_type": "decimal",
+          "description": "Amount refunded"
+        },
+        {
+          "name": "return_reason",
+          "data_type": "varchar",
+          "description": "Reason for return"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "raw",
+      "table_name": "promotions",
+      "columns": [
+        {
+          "name": "promo_id",
+          "data_type": "int",
+          "description": "Unique promotion identifier"
+        },
+        {
+          "name": "promo_name",
+          "data_type": "varchar",
+          "description": "Promotion name"
+        },
+        {
+          "name": "promo_type",
+          "data_type": "varchar",
+          "description": "Type of promotion"
+        },
+        {
+          "name": "start_date",
+          "data_type": "date",
+          "description": "Promotion start date"
+        },
+        {
+          "name": "end_date",
+          "data_type": "date",
+          "description": "Promotion end date"
+        },
+        {
+          "name": "product_id",
+          "data_type": "int",
+          "description": "Product the promotion applies to (nullable)"
+        }
+      ],
+      "table_type": "source"
+    },
+    {
+      "schema_name": "raw",
+      "table_name": "shipping",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "int",
+          "description": "Customer who received the shipment"
+        },
+        {
+          "name": "ship_date",
+          "data_type": "date",
+          "description": "Date item was shipped"
+        },
+        {
+          "name": "delivery_date",
+          "data_type": "date",
+          "description": "Date item was delivered"
+        },
+        {
+          "name": "delivery_status",
+          "data_type": "varchar",
+          "description": "Delivery status (on-time, late)"
+        },
+        {
+          "name": "shipping_cost",
+          "data_type": "decimal",
+          "description": "Cost of shipping"
+        },
+        {
+          "name": "shipping_method",
+          "data_type": "varchar",
+          "description": "Shipping method used"
+        }
+      ],
+      "table_type": "source"
+    }
+  ],
+  "targets": [
+    {
+      "schema_name": "analytics",
+      "table_name": "customer_360_summary",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "int",
+          "description": "Unique customer identifier"
+        },
+        {
+          "name": "full_name",
+          "data_type": "varchar",
+          "description": "Customer full name (first + last)"
+        },
+        {
+          "name": "email",
+          "data_type": "varchar",
+          "description": "Customer email address"
+        },
+        {
+          "name": "phone",
+          "data_type": "varchar",
+          "description": "Customer phone number"
+        },
+        {
+          "name": "country",
+          "data_type": "varchar",
+          "description": "Customer country"
+        },
+        {
+          "name": "state",
+          "data_type": "varchar",
+          "description": "Customer state"
+        },
+        {
+          "name": "city",
+          "data_type": "varchar",
+          "description": "Customer city"
+        },
+        {
+          "name": "signup_date",
+          "data_type": "date",
+          "description": "Customer signup date"
+        },
+        {
+          "name": "days_since_signup",
+          "data_type": "int",
+          "description": "Days since customer signed up"
+        },
+        {
+          "name": "age",
+          "data_type": "int",
+          "description": "Customer age in years"
+        },
+        {
+          "name": "customer_status",
+          "data_type": "varchar",
+          "description": "Customer status (Active/Trial)"
+        },
+        {
+          "name": "total_orders",
+          "data_type": "int",
+          "description": "Total number of orders placed"
+        },
+        {
+          "name": "distinct_products",
+          "data_type": "int",
+          "description": "Number of distinct products purchased"
+        },
+        {
+          "name": "lifetime_revenue",
+          "data_type": "decimal",
+          "description": "Total revenue from customer in USD"
+        },
+        {
+          "name": "lifetime_gross",
+          "data_type": "decimal",
+          "description": "Total gross revenue in USD"
+        },
+        {
+          "name": "lifetime_tax",
+          "data_type": "decimal",
+          "description": "Total tax paid in USD"
+        },
+        {
+          "name": "avg_order_value",
+          "data_type": "decimal",
+          "description": "Average order value in USD"
+        },
+        {
+          "name": "median_order_value",
+          "data_type": "decimal",
+          "description": "Median order value in USD"
+        },
+        {
+          "name": "first_order_date",
+          "data_type": "date",
+          "description": "Date of first order"
+        },
+        {
+          "name": "last_order_date",
+          "data_type": "date",
+          "description": "Date of last order"
+        },
+        {
+          "name": "days_since_last_order",
+          "data_type": "int",
+          "description": "Days since last order"
+        },
+        {
+          "name": "total_items_purchased",
+          "data_type": "int",
+          "description": "Total quantity of items purchased"
+        },
+        {
+          "name": "online_orders",
+          "data_type": "int",
+          "description": "Number of online orders"
+        },
+        {
+          "name": "offline_orders",
+          "data_type": "int",
+          "description": "Number of offline orders"
+        },
+        {
+          "name": "online_pct",
+          "data_type": "decimal",
+          "description": "Percentage of orders that were online"
+        },
+        {
+          "name": "payment_methods_used",
+          "data_type": "int",
+          "description": "Number of distinct payment methods used"
+        },
+        {
+          "name": "total_returns",
+          "data_type": "int",
+          "description": "Total number of returns"
+        },
+        {
+          "name": "total_refund_amount",
+          "data_type": "decimal",
+          "description": "Total refund amount"
+        },
+        {
+          "name": "return_rate_pct",
+          "data_type": "decimal",
+          "description": "Return rate as percentage"
+        },
+        {
+          "name": "products_returned",
+          "data_type": "int",
+          "description": "Number of distinct products returned"
+        },
+        {
+          "name": "total_sessions",
+          "data_type": "int",
+          "description": "Total web sessions"
+        },
+        {
+          "name": "page_views",
+          "data_type": "int",
+          "description": "Total page views"
+        },
+        {
+          "name": "add_to_cart_events",
+          "data_type": "int",
+          "description": "Total add to cart events"
+        },
+        {
+          "name": "search_events",
+          "data_type": "int",
+          "description": "Total search events"
+        },
+        {
+          "name": "avg_time_on_page",
+          "data_type": "decimal",
+          "description": "Average time on page in seconds"
+        },
+        {
+          "name": "days_since_last_activity",
+          "data_type": "int",
+          "description": "Days since last web activity"
+        },
+        {
+          "name": "bounce_rate",
+          "data_type": "decimal",
+          "description": "Web session bounce rate"
+        },
+        {
+          "name": "top_product_1",
+          "data_type": "varchar",
+          "description": "Top purchased product by revenue"
+        },
+        {
+          "name": "top_product_1_revenue",
+          "data_type": "decimal",
+          "description": "Revenue from top product"
+        },
+        {
+          "name": "top_product_2",
+          "data_type": "varchar",
+          "description": "Second top product by revenue"
+        },
+        {
+          "name": "top_product_2_revenue",
+          "data_type": "decimal",
+          "description": "Revenue from second top product"
+        },
+        {
+          "name": "top_product_3",
+          "data_type": "varchar",
+          "description": "Third top product by revenue"
+        },
+        {
+          "name": "top_category",
+          "data_type": "varchar",
+          "description": "Top category by spend"
+        },
+        {
+          "name": "top_category_spend",
+          "data_type": "decimal",
+          "description": "Spend in top category"
+        },
+        {
+          "name": "promotions_used",
+          "data_type": "int",
+          "description": "Number of promotions used"
+        },
+        {
+          "name": "total_promo_savings",
+          "data_type": "decimal",
+          "description": "Total savings from promotions"
+        },
+        {
+          "name": "promo_names",
+          "data_type": "varchar",
+          "description": "Names of promotions used"
+        },
+        {
+          "name": "avg_delivery_days",
+          "data_type": "decimal",
+          "description": "Average delivery time in days"
+        },
+        {
+          "name": "fastest_delivery",
+          "data_type": "int",
+          "description": "Fastest delivery time in days"
+        },
+        {
+          "name": "slowest_delivery",
+          "data_type": "int",
+          "description": "Slowest delivery time in days"
+        },
+        {
+          "name": "late_deliveries",
+          "data_type": "int",
+          "description": "Number of late deliveries"
+        },
+        {
+          "name": "total_shipping_cost",
+          "data_type": "decimal",
+          "description": "Total shipping costs paid"
+        },
+        {
+          "name": "preferred_shipping_method",
+          "data_type": "varchar",
+          "description": "Most frequently used shipping method"
+        },
+        {
+          "name": "latest_month_revenue",
+          "data_type": "decimal",
+          "description": "Revenue in most recent month"
+        },
+        {
+          "name": "latest_3m_avg",
+          "data_type": "decimal",
+          "description": "3-month rolling average revenue"
+        },
+        {
+          "name": "latest_6m_total",
+          "data_type": "decimal",
+          "description": "6-month rolling total revenue"
+        },
+        {
+          "name": "mom_growth_pct",
+          "data_type": "decimal",
+          "description": "Month-over-month growth percentage"
+        },
+        {
+          "name": "recency_score",
+          "data_type": "int",
+          "description": "RFM recency score (1-5)"
+        },
+        {
+          "name": "frequency_score",
+          "data_type": "int",
+          "description": "RFM frequency score (1-5)"
+        },
+        {
+          "name": "monetary_score",
+          "data_type": "int",
+          "description": "RFM monetary score (1-5)"
+        },
+        {
+          "name": "rfm_total",
+          "data_type": "int",
+          "description": "Total RFM score"
+        },
+        {
+          "name": "rfm_segment_name",
+          "data_type": "varchar",
+          "description": "RFM segment name (Champion, Loyal, etc.)"
+        },
+        {
+          "name": "customer_tier",
+          "data_type": "varchar",
+          "description": "Customer tier (Platinum, Gold, Silver, Bronze)"
+        },
+        {
+          "name": "revenue_rank",
+          "data_type": "int",
+          "description": "Revenue rank among all customers"
+        },
+        {
+          "name": "revenue_percentile",
+          "data_type": "decimal",
+          "description": "Revenue percentile rank"
+        },
+        {
+          "name": "engagement_status",
+          "data_type": "varchar",
+          "description": "Engagement status (Active, Warm, Cooling, Dormant)"
+        },
+        {
+          "name": "predicted_3yr_ltv",
+          "data_type": "decimal",
+          "description": "Predicted 3-year lifetime value"
+        },
+        {
+          "name": "ltv_segment",
+          "data_type": "varchar",
+          "description": "LTV segment (High/Medium/Low Value, Churned)"
+        },
+        {
+          "name": "recommended_categories",
+          "data_type": "varchar",
+          "description": "Recommended product categories for cross-sell"
+        },
+        {
+          "name": "num_recommendations",
+          "data_type": "int",
+          "description": "Number of cross-sell recommendations"
+        },
+        {
+          "name": "nps_proxy",
+          "data_type": "varchar",
+          "description": "Net Promoter Score proxy (Promoter/Passive/Detractor)"
+        },
+        {
+          "name": "etl_timestamp",
+          "data_type": "datetime",
+          "description": "ETL processing timestamp"
+        },
+        {
+          "name": "model_version",
+          "data_type": "varchar",
+          "description": "Model version identifier"
+        }
+      ],
+      "table_type": "target"
+    }
+  ],
+  "components": [
+    {
+      "name": "active_customers",
+      "component_type": "CTE",
+      "description": "Filters customers to active and trial status only, normalizes names (UPPER/TRIM), calculates age and days since signup. Excludes customers without email or who signed up before 2018.",
+      "input_tables": [
+        "raw.customers"
+      ],
+      "output_columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "country",
+        "state",
+        "city",
+        "signup_date",
+        "date_of_birth",
+        "days_since_signup",
+        "age",
+        "customer_status",
+        "preferred_currency"
+      ],
+      "sql_text": "WHERE c.status IN ('active', 'trial') AND c.email IS NOT NULL AND c.signup_date >= '2018-01-01'"
+    },
+    {
+      "name": "category_hierarchy",
+      "component_type": "CTE",
+      "description": "Builds complete category hierarchy paths using recursive CTE. Creates full path strings like 'Electronics > Computers > Laptops' and tracks depth level up to 5 levels deep.",
+      "input_tables": [
+        "raw.product_categories"
+      ],
+      "output_columns": [
+        "category_id",
+        "category_name",
+        "parent_category_id",
+        "full_path",
+        "depth"
+      ],
+      "sql_text": "RECURSIVE CTE: CAST(ch.full_path + ' > ' + child.category_name AS VARCHAR(500)) WHERE ch.depth < 5"
+    },
+    {
+      "name": "enriched_products",
+      "component_type": "CTE",
+      "description": "Enriches products with category hierarchy information and calculates profit margins. Categorizes products as High/Medium/Low margin based on margin percentage thresholds (>50%, >25%).",
+      "input_tables": [
+        "raw.products",
+        "category_hierarchy"
+      ],
+      "output_columns": [
+        "product_id",
+        "product_name",
+        "sku",
+        "unit_price",
+        "cost_price",
+        "margin",
+        "margin_category",
+        "category_id",
+        "leaf_category",
+        "category_path",
+        "category_depth",
+        "launch_date",
+        "months_since_launch",
+        "weight_kg",
+        "is_digital"
+      ],
+      "sql_text": "CASE WHEN (p.unit_price - p.cost_price) / NULLIF(p.unit_price, 0) > 0.5 THEN 'High Margin' WHEN > 0.25 THEN 'Medium Margin' ELSE 'Low Margin' END"
+    },
+    {
+      "name": "exchange_rates_latest",
+      "component_type": "CTE",
+      "description": "Gets the most recent exchange rate for each currency pair using ROW_NUMBER window function partitioned by currency pair and ordered by date descending.",
+      "input_tables": [
+        "raw.exchange_rates"
+      ],
+      "output_columns": [
+        "from_currency",
+        "to_currency",
+        "rate",
+        "rate_date"
+      ],
+      "sql_text": "ROW_NUMBER() OVER (PARTITION BY from_currency, to_currency ORDER BY rate_date DESC) WHERE rn = 1"
+    },
+    {
+      "name": "transactions_normalized",
+      "component_type": "CTE",
+      "description": "Converts all transaction amounts to USD using latest exchange rates. Calculates gross and net amounts, categorizes channels into Online/Offline groups. Filters out cancelled and fraudulent transactions from 2018 onwards.",
+      "input_tables": [
+        "raw.transactions",
+        "exchange_rates_latest"
+      ],
+      "output_columns": [
+        "transaction_id",
+        "customer_id",
+        "product_id",
+        "order_date",
+        "quantity",
+        "unit_price_local",
+        "currency",
+        "discount_amount",
+        "tax_amount",
+        "exchange_rate",
+        "gross_amount_usd",
+        "net_amount_usd",
+        "tax_amount_usd",
+        "payment_method",
+        "channel",
+        "channel_group",
+        "store_id",
+        "transaction_status"
+      ],
+      "sql_text": "t.unit_price_local * t.quantity * COALESCE(er.rate, 1.0) AS gross_amount_usd, CASE WHEN t.channel IN ('web','mobile') THEN 'Online' WHEN IN ('store','phone') THEN 'Offline' ELSE 'Other' END"
+    },
+    {
+      "name": "returns_summary",
+      "component_type": "CTE",
+      "description": "Aggregates return metrics per customer-product combination including return count, total refund amount, last return date, and concatenated return reasons.",
+      "input_tables": [
+        "raw.returns"
+      ],
+      "output_columns": [
+        "customer_id",
+        "product_id",
+        "return_count",
+        "total_refund",
+        "last_return_date",
+        "return_reasons"
+      ],
+      "sql_text": "COUNT(*) AS return_count, SUM(r.refund_amount) AS total_refund, STRING_AGG(r.return_reason, '; ') AS return_reasons GROUP BY customer_id, product_id"
+    },
+    {
+      "name": "customer_transactions",
+      "component_type": "CTE",
+      "description": "Aggregates comprehensive transaction metrics per customer including order counts, revenue totals, average order value, date ranges, channel splits, and median order value using PERCENTILE_CONT.",
+      "input_tables": [
+        "transactions_normalized"
+      ],
+      "output_columns": [
+        "customer_id",
+        "total_orders",
+        "distinct_products",
+        "lifetime_revenue",
+        "lifetime_gross",
+        "lifetime_tax",
+        "avg_order_value",
+        "first_order_date",
+        "last_order_date",
+        "days_since_last_order",
+        "total_items_purchased",
+        "online_orders",
+        "offline_orders",
+        "payment_methods_used",
+        "median_order_value"
+      ],
+      "sql_text": "COUNT(DISTINCT tn.transaction_id) AS total_orders, SUM(tn.net_amount_usd) AS lifetime_revenue, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY tn.net_amount_usd) OVER (PARTITION BY tn.customer_id) AS median_order_value"
+    },
+    {
+      "name": "customer_returns",
+      "component_type": "CTE",
+      "description": "Aggregates return metrics per customer including total returns, refund amounts, last return date, and count of distinct products returned.",
+      "input_tables": [
+        "returns_summary"
+      ],
+      "output_columns": [
+        "customer_id",
+        "total_returns",
+        "total_refund_amount",
+        "last_return_date",
+        "products_returned"
+      ],
+      "sql_text": "SUM(rs.return_count) AS total_returns, SUM(rs.total_refund) AS total_refund_amount, COUNT(DISTINCT rs.product_id) AS products_returned GROUP BY customer_id"
+    },
+    {
+      "name": "customer_web_activity",
+      "component_type": "CTE",
+      "description": "Aggregates web engagement metrics per customer including event counts by type, session metrics, time on page, and calculates bounce rate as sessions with only 1 event divided by total sessions.",
+      "input_tables": [
+        "raw.web_events"
+      ],
+      "output_columns": [
+        "customer_id",
+        "total_events",
+        "total_sessions",
+        "page_views",
+        "add_to_cart_events",
+        "search_events",
+        "wishlist_events",
+        "avg_time_on_page",
+        "last_activity",
+        "days_since_last_activity",
+        "bounce_rate"
+      ],
+      "sql_text": "SUM(CASE WHEN we.event_type = 'page_view' THEN 1 ELSE 0 END) AS page_views, CAST(SUM(CASE WHEN we.session_events = 1 THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(COUNT(DISTINCT we.session_id), 0) AS bounce_rate"
+    },
+    {
+      "name": "top_products_per_customer",
+      "component_type": "CTE",
+      "description": "Ranks products by revenue per customer using ROW_NUMBER window function. Calculates total revenue and quantity per customer-product combination to identify top performing products.",
+      "input_tables": [
+        "transactions_normalized",
+        "enriched_products"
+      ],
+      "output_columns": [
+        "customer_id",
+        "product_id",
+        "product_name",
+        "leaf_category",
+        "product_revenue",
+        "product_quantity",
+        "product_rank"
+      ],
+      "sql_text": "ROW_NUMBER() OVER (PARTITION BY tn.customer_id ORDER BY SUM(tn.net_amount_usd) DESC) AS product_rank"
+    },
+    {
+      "name": "top_categories_per_customer",
+      "component_type": "CTE",
+      "description": "Ranks product categories by spend per customer using ROW_NUMBER window function. Aggregates spend and order count per customer-category combination.",
+      "input_tables": [
+        "transactions_normalized",
+        "enriched_products"
+      ],
+      "output_columns": [
+        "customer_id",
+        "leaf_category",
+        "category_path",
+        "category_spend",
+        "category_orders",
+        "category_rank"
+      ],
+      "sql_text": "ROW_NUMBER() OVER (PARTITION BY tn.customer_id ORDER BY SUM(tn.net_amount_usd) DESC) AS category_rank"
+    },
+    {
+      "name": "promotion_usage",
+      "component_type": "CTE",
+      "description": "Identifies which promotions each customer used by joining transactions with promotions based on date ranges and optional product matching. Calculates usage frequency and total discount savings.",
+      "input_tables": [
+        "transactions_normalized",
+        "raw.promotions"
+      ],
+      "output_columns": [
+        "customer_id",
+        "promo_id",
+        "promo_name",
+        "promo_type",
+        "times_used",
+        "total_discount_usd"
+      ],
+      "sql_text": "JOIN ON tn.order_date BETWEEN p.start_date AND p.end_date AND (p.product_id IS NULL OR p.product_id = tn.product_id) WHERE tn.discount_amount > 0"
+    },
+    {
+      "name": "customer_promo_summary",
+      "component_type": "CTE",
+      "description": "Summarizes promotion usage per customer including count of distinct promotions used, total savings, last promotion type, and concatenated promotion names.",
+      "input_tables": [
+        "promotion_usage"
+      ],
+      "output_columns": [
+        "customer_id",
+        "promotions_used",
+        "total_promo_savings",
+        "last_promo_type",
+        "promo_names"
+      ],
+      "sql_text": "COUNT(DISTINCT pu.promo_id) AS promotions_used, SUM(pu.total_discount_usd) AS total_promo_savings, STRING_AGG(DISTINCT pu.promo_name, ', ') AS promo_names"
+    },
+    {
+      "name": "shipping_metrics",
+      "component_type": "CTE",
+      "description": "Calculates shipping performance metrics per customer including average delivery time, fastest/slowest delivery, late delivery count, total shipping costs, and most frequently used shipping method via correlated subquery.",
+      "input_tables": [
+        "raw.shipping"
+      ],
+      "output_columns": [
+        "customer_id",
+        "total_shipments",
+        "avg_delivery_days",
+        "fastest_delivery",
+        "slowest_delivery",
+        "late_deliveries",
+        "total_shipping_cost",
+        "preferred_shipping_method"
+      ],
+      "sql_text": "AVG(DATEDIFF(DAY, s.ship_date, s.delivery_date)) AS avg_delivery_days, (SELECT TOP 1 s2.shipping_method FROM raw.shipping s2 WHERE s2.customer_id = s.customer_id GROUP BY s2.shipping_method ORDER BY COUNT(*) DESC) AS preferred_shipping_method"
+    },
+    {
+      "name": "monthly_spend",
+      "component_type": "CTE",
+      "description": "Creates monthly time series of customer spend by grouping transactions by customer and month using DATEFROMPARTS to create month start dates.",
+      "input_tables": [
+        "transactions_normalized"
+      ],
+      "output_columns": [
+        "customer_id",
+        "month_start",
+        "monthly_revenue",
+        "monthly_orders"
+      ],
+      "sql_text": "DATEFROMPARTS(YEAR(tn.order_date), MONTH(tn.order_date), 1) AS month_start, SUM(tn.net_amount_usd) AS monthly_revenue GROUP BY customer_id, month_start"
+    },
+    {
+      "name": "spend_trend",
+      "component_type": "CTE",
+      "description": "Calculates spend trends using window functions including LAG/LEAD for previous/next month comparison, rolling 3-month average, rolling 6-month total, and NTILE for spend quartiles.",
+      "input_tables": [
+        "monthly_spend"
+      ],
+      "output_columns": [
+        "customer_id",
+        "month_start",
+        "monthly_revenue",
+        "monthly_orders",
+        "prev_month_revenue",
+        "next_month_revenue",
+        "rolling_3m_avg",
+        "rolling_6m_total",
+        "spend_quartile"
+      ],
+      "sql_text": "LAG(ms.monthly_revenue, 1) OVER (PARTITION BY ms.customer_id ORDER BY ms.month_start) AS prev_month_revenue, AVG(ms.monthly_revenue) OVER (PARTITION BY ms.customer_id ORDER BY ms.month_start ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS rolling_3m_avg"
+    },
+    {
+      "name": "latest_spend_trend",
+      "component_type": "CTE",
+      "description": "Extracts the most recent month's trend metrics per customer and calculates month-over-month growth percentage using the previous month's revenue.",
+      "input_tables": [
+        "spend_trend"
+      ],
+      "output_columns": [
+        "customer_id",
+        "latest_month_revenue",
+        "latest_3m_avg",
+        "latest_6m_total",
+        "mom_growth_pct",
+        "spend_quartile"
+      ],
+      "sql_text": "CASE WHEN st.prev_month_revenue IS NULL OR = 0 THEN NULL ELSE (st.monthly_revenue - st.prev_month_revenue) / st.prev_month_revenue * 100.0 END AS mom_growth_pct WHERE month_start = MAX(month_start)"
+    },
+    {
+      "name": "rfm_scores",
+      "component_type": "CTE",
+      "description": "Calculates RFM (Recency, Frequency, Monetary) scores using NTILE window functions to create 5-point scales for customer segmentation analysis.",
+      "input_tables": [
+        "customer_transactions"
+      ],
+      "output_columns": [
+        "customer_id",
+        "days_since_last_order",
+        "total_orders",
+        "lifetime_revenue",
+        "recency_score",
+        "frequency_score",
+        "monetary_score"
+      ],
+      "sql_text": "NTILE(5) OVER (ORDER BY ct.days_since_last_order ASC) AS recency_score, NTILE(5) OVER (ORDER BY ct.total_orders DESC) AS frequency_score, NTILE(5) OVER (ORDER BY ct.lifetime_revenue DESC) AS monetary_score"
+    },
+    {
+      "name": "rfm_segment",
+      "component_type": "CTE",
+      "description": "Maps RFM scores to business-meaningful segment names using complex CASE logic: Champion (high scores across all), Loyal (medium-high), New Customer (high recency, low frequency), At Risk (low recency, high frequency/monetary), Lost (low across all), Big Spender (high monetary), Regular (default).",
+      "input_tables": [
+        "rfm_scores"
+      ],
+      "output_columns": [
+        "customer_id",
+        "recency_score",
+        "frequency_score",
+        "monetary_score",
+        "rfm_total",
+        "rfm_segment_name"
+      ],
+      "sql_text": "CASE WHEN rfm.recency_score >= 4 AND rfm.frequency_score >= 4 AND rfm.monetary_score >= 4 THEN 'Champion' WHEN rfm.recency_score >= 3 AND rfm.frequency_score >= 3 AND rfm.monetary_score >= 3 THEN 'Loyal' WHEN rfm.recency_score >= 4 AND rfm.frequency_score <= 2 THEN 'New Customer' WHEN rfm.recency_score <= 2 AND rfm.frequency_score >= 3 AND rfm.monetary_score >= 3 THEN 'At Risk' WHEN rfm.recency_score <= 2 AND rfm.frequency_score <= 2 AND rfm.monetary_score <= 2 THEN 'Lost' WHEN rfm.recency_score >= 3 AND rfm.monetary_score >= 4 THEN 'Big Spender' ELSE 'Regular' END"
+    },
+    {
+      "name": "customer_tier_calc",
+      "component_type": "CTE",
+      "description": "Assigns customer tiers based on lifetime revenue and order count thresholds: Platinum (≥$50K & ≥50 orders), Gold (≥$20K & ≥20), Silver (≥$5K & ≥5), Bronze (all others). Also calculates revenue rank and percentile, and engagement status based on days since last order.",
+      "input_tables": [
+        "customer_transactions"
+      ],
+      "output_columns": [
+        "customer_id",
+        "lifetime_revenue",
+        "total_orders",
+        "avg_order_value",
+        "customer_tier",
+        "revenue_rank",
+        "revenue_percentile",
+        "engagement_status"
+      ],
+      "sql_text": "CASE WHEN ct.lifetime_revenue >= 50000 AND ct.total_orders >= 50 THEN 'Platinum' WHEN ct.lifetime_revenue >= 20000 AND ct.total_orders >= 20 THEN 'Gold' WHEN ct.lifetime_revenue >= 5000 AND ct.total_orders >= 5 THEN 'Silver' ELSE 'Bronze' END AS customer_tier, CASE WHEN ct.days_since_last_order <= 30 THEN 'Active' WHEN <= 90 THEN 'Warm' WHEN <= 180 THEN 'Cooling' ELSE 'Dormant' END AS engagement_status"
+    },
+    {
+      "name": "cross_sell_candidates",
+      "component_type": "CTE",
+      "description": "Identifies cross-sell opportunities by finding frequently co-purchased categories that a customer hasn't tried yet. Uses complex joins to find category pairs with ≥10 co-purchasing customers, then filters out categories the customer has already purchased.",
+      "input_tables": [
+        "active_customers",
+        "top_categories_per_customer",
+        "transactions_normalized",
+        "enriched_products"
+      ],
+      "output_columns": [
+        "customer_id",
+        "purchased_category",
+        "co_category",
+        "co_purchase_count"
+      ],
+      "sql_text": "Complex multi-table join to find co-purchased categories with COUNT(DISTINCT tn1.customer_id) >= 10, filtered by NOT EXISTS for categories customer hasn't purchased"
+    },
+    {
+      "name": "cross_sell_agg",
+      "component_type": "CTE",
+      "description": "Aggregates cross-sell recommendations per customer, keeping top 5 recommendations by co-purchase frequency and concatenating category names into a comma-separated list.",
+      "input_tables": [
+        "cross_sell_candidates"
+      ],
+      "output_columns": [
+        "customer_id",
+        "recommended_categories",
+        "num_recommendations"
+      ],
+      "sql_text": "STRING_AGG(csc.co_category, ', ') AS recommended_categories WHERE ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY co_purchase_count DESC) <= 5"
+    },
+    {
+      "name": "predicted_ltv",
+      "component_type": "CTE",
+      "description": "Calculates predicted 3-year lifetime value using historical spend patterns. Formula: avg_order_value * monthly_order_frequency * 12 months * 3 years. Sets LTV to 0 for customers inactive >365 days. Segments customers as High/Medium/Low Value or Churned based on historical spend and activity.",
+      "input_tables": [
+        "customer_transactions"
+      ],
+      "output_columns": [
+        "customer_id",
+        "lifetime_revenue",
+        "total_orders",
+        "avg_order_value",
+        "predicted_3yr_ltv",
+        "ltv_segment"
+      ],
+      "sql_text": "CASE WHEN ct.days_since_last_order > 365 THEN 0 ELSE ct.avg_order_value * (ct.total_orders / NULLIF(DATEDIFF(MONTH, ct.first_order_date, ct.last_order_date), 0)) * 12 * 3 END AS predicted_3yr_ltv"
+    }
+  ],
+  "column_lineage": [
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "customer_id",
+      "source_columns": [
+        "raw.customers.customer_id"
+      ],
+      "transformation": "raw.customers.customer_id",
+      "transformation_type": "direct_copy",
+      "intermediate_steps": [
+        {
+          "component_name": "active_customers",
+          "expression": "c.customer_id",
+          "output_column": "customer_id"
+        }
+      ],
+      "notes": "Primary key flowing through from source customers table"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "full_name",
+      "source_columns": [
+        "raw.customers.first_name",
+        "raw.customers.last_name"
+      ],
+      "transformation": "ac.first_name + ' ' + ac.last_name",
+      "transformation_type": "concatenation",
+      "intermediate_steps": [
+        {
+          "component_name": "active_customers",
+          "expression": "UPPER(TRIM(c.first_name)) AS first_name, UPPER(TRIM(c.last_name)) AS last_name",
+          "output_column": "first_name, last_name"
+        }
+      ],
+      "notes": "Concatenates normalized first and last names with space separator"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "age",
+      "source_columns": [
+        "raw.customers.date_of_birth"
+      ],
+      "transformation": "DATEDIFF(YEAR, c.date_of_birth, GETDATE())",
+      "transformation_type": "date_manipulation",
+      "intermediate_steps": [
+        {
+          "component_name": "active_customers",
+          "expression": "DATEDIFF(YEAR, c.date_of_birth, GETDATE())",
+          "output_column": "age"
+        }
+      ],
+      "notes": "Calculates customer age in years from birth date to current date"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "customer_status",
+      "source_columns": [
+        "raw.customers.status"
+      ],
+      "transformation": "CASE WHEN c.status = 'active' THEN 'Active' WHEN c.status = 'trial' THEN 'Trial' END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "active_customers",
+          "expression": "CASE WHEN c.status = 'active' THEN 'Active' WHEN c.status = 'trial' THEN 'Trial' END",
+          "output_column": "customer_status"
+        }
+      ],
+      "notes": "Standardizes customer status values to proper case"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "lifetime_revenue",
+      "source_columns": [
+        "raw.transactions.unit_price_local",
+        "raw.transactions.quantity",
+        "raw.transactions.discount_amount",
+        "raw.exchange_rates.rate"
+      ],
+      "transformation": "SUM((t.unit_price_local * t.quantity - t.discount_amount) * COALESCE(er.rate, 1.0))",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "transactions_normalized",
+          "expression": "(t.unit_price_local * t.quantity - t.discount_amount) * COALESCE(er.rate, 1.0)",
+          "output_column": "net_amount_usd"
+        },
+        {
+          "component_name": "customer_transactions",
+          "expression": "SUM(tn.net_amount_usd)",
+          "output_column": "lifetime_revenue"
+        }
+      ],
+      "notes": "Total net revenue from customer in USD after currency conversion and discounts"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "avg_order_value",
+      "source_columns": [
+        "raw.transactions.unit_price_local",
+        "raw.transactions.quantity",
+        "raw.transactions.discount_amount",
+        "raw.exchange_rates.rate"
+      ],
+      "transformation": "AVG((t.unit_price_local * t.quantity - t.discount_amount) * COALESCE(er.rate, 1.0))",
+      "transformation_type": "aggregation",
+      "intermediate_steps": [
+        {
+          "component_name": "transactions_normalized",
+          "expression": "(t.unit_price_local * t.quantity - t.discount_amount) * COALESCE(er.rate, 1.0)",
+          "output_column": "net_amount_usd"
+        },
+        {
+          "component_name": "customer_transactions",
+          "expression": "AVG(tn.net_amount_usd)",
+          "output_column": "avg_order_value"
+        }
+      ],
+      "notes": "Average order value in USD across all customer transactions"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "median_order_value",
+      "source_columns": [
+        "raw.transactions.unit_price_local",
+        "raw.transactions.quantity",
+        "raw.transactions.discount_amount",
+        "raw.exchange_rates.rate"
+      ],
+      "transformation": "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY tn.net_amount_usd) OVER (PARTITION BY tn.customer_id)",
+      "transformation_type": "window_function",
+      "intermediate_steps": [
+        {
+          "component_name": "transactions_normalized",
+          "expression": "(t.unit_price_local * t.quantity - t.discount_amount) * COALESCE(er.rate, 1.0)",
+          "output_column": "net_amount_usd"
+        },
+        {
+          "component_name": "customer_transactions",
+          "expression": "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY tn.net_amount_usd) OVER (PARTITION BY tn.customer_id)",
+          "output_column": "median_order_value"
+        }
+      ],
+      "notes": "Median order value using percentile function for more robust central tendency"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "online_pct",
+      "source_columns": [
+        "raw.transactions.channel"
+      ],
+      "transformation": "CASE WHEN COALESCE(ct.total_orders, 0) = 0 THEN 0 ELSE CAST(ct.online_orders AS FLOAT) / ct.total_orders * 100 END",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "transactions_normalized",
+          "expression": "CASE WHEN t.channel IN ('web','mobile') THEN 'Online' WHEN t.channel IN ('store','phone') THEN 'Offline' ELSE 'Other' END",
+          "output_column": "channel_group"
+        },
+        {
+          "component_name": "customer_transactions",
+          "expression": "SUM(CASE WHEN tn.channel_group = 'Online' THEN 1 ELSE 0 END)",
+          "output_column": "online_orders"
+        }
+      ],
+      "notes": "Percentage of orders placed through online channels (web/mobile)"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "return_rate_pct",
+      "source_columns": [
+        "raw.returns.customer_id",
+        "raw.returns.product_id"
+      ],
+      "transformation": "CASE WHEN COALESCE(ct.total_orders, 0) = 0 THEN 0 ELSE CAST(COALESCE(cr.total_returns, 0) AS FLOAT) / ct.total_orders * 100 END",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "returns_summary",
+          "expression": "COUNT(*)",
+          "output_column": "return_count"
+        },
+        {
+          "component_name": "customer_returns",
+          "expression": "SUM(rs.return_count)",
+          "output_column": "total_returns"
+        }
+      ],
+      "notes": "Return rate as percentage of total orders"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "bounce_rate",
+      "source_columns": [
+        "raw.web_events.session_id",
+        "raw.web_events.customer_id"
+      ],
+      "transformation": "CAST(SUM(CASE WHEN we.session_events = 1 THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(COUNT(DISTINCT we.session_id), 0)",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "customer_web_activity",
+          "expression": "COUNT(*) OVER (PARTITION BY we_inner.session_id) AS session_events",
+          "output_column": "session_events"
+        },
+        {
+          "component_name": "customer_web_activity",
+          "expression": "CAST(SUM(CASE WHEN we.session_events = 1 THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(COUNT(DISTINCT we.session_id), 0)",
+          "output_column": "bounce_rate"
+        }
+      ],
+      "notes": "Bounce rate calculated as sessions with only 1 event divided by total sessions"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "top_product_1",
+      "source_columns": [
+        "raw.products.product_name",
+        "raw.transactions.net_amount_usd"
+      ],
+      "transformation": "ROW_NUMBER() OVER (PARTITION BY tn.customer_id ORDER BY SUM(tn.net_amount_usd) DESC) = 1",
+      "transformation_type": "window_function",
+      "intermediate_steps": [
+        {
+          "component_name": "top_products_per_customer",
+          "expression": "ROW_NUMBER() OVER (PARTITION BY tn.customer_id ORDER BY SUM(tn.net_amount_usd) DESC)",
+          "output_column": "product_rank"
+        }
+      ],
+      "notes": "Product name with highest revenue for this customer"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "customer_tier",
+      "source_columns": [
+        "raw.transactions.unit_price_local",
+        "raw.transactions.quantity",
+        "raw.transactions.discount_amount",
+        "raw.transactions.transaction_id"
+      ],
+      "transformation": "CASE WHEN ct.lifetime_revenue >= 50000 AND ct.total_orders >= 50 THEN 'Platinum' WHEN ct.lifetime_revenue >= 20000 AND ct.total_orders >= 20 THEN 'Gold' WHEN ct.lifetime_revenue >= 5000 AND ct.total_orders >= 5 THEN 'Silver' ELSE 'Bronze' END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "customer_transactions",
+          "expression": "SUM(tn.net_amount_usd) AS lifetime_revenue, COUNT(DISTINCT tn.transaction_id) AS total_orders",
+          "output_column": "lifetime_revenue, total_orders"
+        },
+        {
+          "component_name": "customer_tier_calc",
+          "expression": "CASE WHEN ct.lifetime_revenue >= 50000 AND ct.total_orders >= 50 THEN 'Platinum' WHEN ct.lifetime_revenue >= 20000 AND ct.total_orders >= 20 THEN 'Gold' WHEN ct.lifetime_revenue >= 5000 AND ct.total_orders >= 5 THEN 'Silver' ELSE 'Bronze' END",
+          "output_column": "customer_tier"
+        }
+      ],
+      "notes": "Business tier assignment based on revenue and order count thresholds"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "rfm_segment_name",
+      "source_columns": [
+        "raw.transactions.order_date",
+        "raw.transactions.transaction_id",
+        "raw.transactions.net_amount_usd"
+      ],
+      "transformation": "CASE WHEN rfm.recency_score >= 4 AND rfm.frequency_score >= 4 AND rfm.monetary_score >= 4 THEN 'Champion' WHEN rfm.recency_score >= 3 AND rfm.frequency_score >= 3 AND rfm.monetary_score >= 3 THEN 'Loyal' WHEN rfm.recency_score >= 4 AND rfm.frequency_score <= 2 THEN 'New Customer' WHEN rfm.recency_score <= 2 AND rfm.frequency_score >= 3 AND rfm.monetary_score >= 3 THEN 'At Risk' WHEN rfm.recency_score <= 2 AND rfm.frequency_score <= 2 AND rfm.monetary_score <= 2 THEN 'Lost' WHEN rfm.recency_score >= 3 AND rfm.monetary_score >= 4 THEN 'Big Spender' ELSE 'Regular' END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "customer_transactions",
+          "expression": "DATEDIFF(DAY, MAX(tn.order_date), GETDATE()) AS days_since_last_order, COUNT(DISTINCT tn.transaction_id) AS total_orders, SUM(tn.net_amount_usd) AS lifetime_revenue",
+          "output_column": "days_since_last_order, total_orders, lifetime_revenue"
+        },
+        {
+          "component_name": "rfm_scores",
+          "expression": "NTILE(5) OVER (ORDER BY ct.days_since_last_order ASC) AS recency_score, NTILE(5) OVER (ORDER BY ct.total_orders DESC) AS frequency_score, NTILE(5) OVER (ORDER BY ct.lifetime_revenue DESC) AS monetary_score",
+          "output_column": "recency_score, frequency_score, monetary_score"
+        },
+        {
+          "component_name": "rfm_segment",
+          "expression": "Complex CASE WHEN logic mapping RFM scores to segment names",
+          "output_column": "rfm_segment_name"
+        }
+      ],
+      "notes": "RFM segmentation for customer behavior analysis and targeting"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "predicted_3yr_ltv",
+      "source_columns": [
+        "raw.transactions.unit_price_local",
+        "raw.transactions.quantity",
+        "raw.transactions.order_date"
+      ],
+      "transformation": "CASE WHEN ct.days_since_last_order > 365 THEN 0 ELSE ct.avg_order_value * (ct.total_orders / NULLIF(DATEDIFF(MONTH, ct.first_order_date, ct.last_order_date), 0)) * 12 * 3 END",
+      "transformation_type": "calculation",
+      "intermediate_steps": [
+        {
+          "component_name": "customer_transactions",
+          "expression": "AVG(tn.net_amount_usd) AS avg_order_value, COUNT(DISTINCT tn.transaction_id) AS total_orders, MIN(tn.order_date) AS first_order_date, MAX(tn.order_date) AS last_order_date",
+          "output_column": "avg_order_value, total_orders, first_order_date, last_order_date"
+        },
+        {
+          "component_name": "predicted_ltv",
+          "expression": "ct.avg_order_value * (ct.total_orders / NULLIF(DATEDIFF(MONTH, ct.first_order_date, ct.last_order_date), 0)) * 12 * 3",
+          "output_column": "predicted_3yr_ltv"
+        }
+      ],
+      "notes": "Predicted 3-year lifetime value based on historical spend patterns and order frequency"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "nps_proxy",
+      "source_columns": [
+        "raw.transactions.order_date",
+        "raw.transactions.transaction_id",
+        "raw.transactions.net_amount_usd"
+      ],
+      "transformation": "CASE WHEN rfm.rfm_segment_name IN ('Champion', 'Loyal', 'Big Spender') THEN 'Promoter' WHEN rfm.rfm_segment_name IN ('At Risk', 'Lost') THEN 'Detractor' ELSE 'Passive' END",
+      "transformation_type": "case_logic",
+      "intermediate_steps": [
+        {
+          "component_name": "rfm_segment",
+          "expression": "Complex RFM segment calculation",
+          "output_column": "rfm_segment_name"
+        }
+      ],
+      "notes": "Net Promoter Score proxy based on RFM segment classification"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "etl_timestamp",
+      "source_columns": [],
+      "transformation": "GETDATE()",
+      "transformation_type": "constant",
+      "intermediate_steps": [],
+      "notes": "ETL processing timestamp for data lineage tracking"
+    },
+    {
+      "target_table": "analytics.customer_360_summary",
+      "target_column": "model_version",
+      "source_columns": [],
+      "transformation": "'v2.3'",
+      "transformation_type": "constant",
+      "intermediate_steps": [],
+      "notes": "Model version identifier for tracking analytics logic changes"
+    }
+  ],
+  "data_flow_edges": [
+    {
+      "from_node": "raw.customers",
+      "to_node": "active_customers",
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "country",
+        "state",
+        "city",
+        "signup_date",
+        "date_of_birth",
+        "status",
+        "preferred_currency"
+      ],
+      "edge_label": "filter: status IN ('active','trial') AND email IS NOT NULL AND signup_date >= '2018-01-01'"
+    },
+    {
+      "from_node": "raw.product_categories",
+      "to_node": "category_hierarchy",
+      "columns": [
+        "category_id",
+        "category_name",
+        "parent_category_id"
+      ],
+      "edge_label": "recursive CTE: build full category paths with depth tracking"
+    },
+    {
+      "from_node": "raw.products",
+      "to_node": "enriched_products",
+      "columns": [
+        "product_id",
+        "product_name",
+        "sku",
+        "unit_price",
+        "cost_price",
+        "category_id",
+        "launch_date",
+        "weight_kg",
+        "is_digital"
+      ],
+      "edge_label": "left join with category hierarchy"
+    },
+    {
+      "from_node": "category_hierarchy",
+      "to_node": "enriched_products",
+      "columns": [
+        "category_id",
+        "category_name",
+        "full_path",
+        "depth"
+      ],
+      "edge_label": "enrich products with category paths and calculate margins"
+    },
+    {
+      "from_node": "raw.exchange_rates",
+      "to_node": "exchange_rates_latest",
+      "columns": [
+        "from_currency",
+        "to_currency",
+        "rate",
+        "rate_date"
+      ],
+      "edge_label": "window function: get latest rate per currency pair"
+    },
+    {
+      "from_node": "raw.transactions",
+      "to_node": "transactions_normalized",
+      "columns": [
+        "transaction_id",
+        "customer_id",
+        "product_id",
+        "order_date",
+        "quantity",
+        "unit_price_local",
+        "currency",
+        "discount_amount",
+        "tax_amount",
+        "payment_method",
+        "channel",
+        "store_id",
+        "status"
+      ],
+      "edge_label": "filter: status NOT IN ('cancelled','fraudulent') AND order_date >= '2018-01-01'"
+    },
+    {
+      "from_node": "exchange_rates_latest",
+      "to_node": "transactions_normalized",
+      "columns": [
+        "from_currency",
+        "to_currency",
+        "rate"
+      ],
+      "edge_label": "left join: convert all amounts to USD"
+    },
+    {
+      "from_node": "raw.returns",
+      "to_node": "returns_summary",
+      "columns": [
+        "customer_id",
+        "product_id",
+        "refund_amount",
+        "return_date",
+        "return_reason"
+      ],
+      "edge_label": "aggregate: count returns, sum refunds, concatenate reasons by customer-product"
+    },
+    {
+      "from_node": "transactions_normalized",
+      "to_node": "customer_transactions",
+      "columns": [
+        "customer_id",
+        "transaction_id",
+        "product_id",
+        "net_amount_usd",
+        "gross_amount_usd",
+        "tax_amount_usd",
+        "order_date",
+        "quantity",
+        "channel_group",
+        "payment_method"
+      ],
+      "edge_label": "aggregate: comprehensive transaction metrics per customer"
+    },
+    {
+      "from_node": "returns_summary",
+      "to_node": "customer_returns",
+      "columns": [
+        "customer_id",
+        "return_count",
+        "total_refund",
+        "last_return_date",
+        "product_id"
+      ],
+      "edge_label": "aggregate: return metrics per customer"
+    },
+    {
+      "from_node": "raw.web_events",
+      "to_node": "customer_web_activity",
+      "columns": [
+        "customer_id",
+        "session_id",
+        "event_type",
+        "event_timestamp",
+        "time_on_page_seconds"
+      ],
+      "edge_label": "filter: customer_id IS NOT NULL, aggregate web engagement metrics"
+    },
+    {
+      "from_node": "transactions_normalized",
+      "to_node": "top_products_per_customer",
+      "columns": [
+        "customer_id",
+        "product_id",
+        "net_amount_usd",
+        "quantity"
+      ],
+      "edge_label": "inner join with enriched_products"
+    },
+    {
+      "from_node": "enriched_products",
+      "to_node": "top_products_per_customer",
+      "columns": [
+        "product_id",
+        "product_name",
+        "leaf_category"
+      ],
+      "edge_label": "rank products by revenue per customer"
+    },
+    {
+      "from_node": "transactions_normalized",
+      "to_node": "top_categories_per_customer",
+      "columns": [
+        "customer_id",
+        "product_id",
+        "net_amount_usd",
+        "transaction_id"
+      ],
+      "edge_label": "inner join with enriched_products"
+    },
+    {
+      "from_node": "enriched_products",
+      "to_node": "top_categories_per_customer",
+      "columns": [
+        "product_id",
+        "leaf_category",
+        "category_path"
+      ],
+      "edge_label": "rank categories by spend per customer, filter: leaf_category IS NOT NULL"
+    },
+    {
+      "from_node": "transactions_normalized",
+      "to_node": "promotion_usage",
+      "columns": [
+        "customer_id",
+        "transaction_id",
+        "order_date",
+        "product_id",
+        "discount_amount",
+        "exchange_rate"
+      ],
+      "edge_label": "inner join with promotions on date range and optional product match"
+    },
+    {
+      "from_node": "raw.promotions",
+      "to_node": "promotion_usage",
+      "columns": [
+        "promo_id",
+        "promo_name",
+        "promo_type",
+        "start_date",
+        "end_date",
+        "product_id"
+      ],
+      "edge_label": "filter: discount_amount > 0"
+    },
+    {
+      "from_node": "promotion_usage",
+      "to_node": "customer_promo_summary",
+      "columns": [
+        "customer_id",
+        "promo_id",
+        "total_discount_usd",
+        "promo_type",
+        "promo_name"
+      ],
+      "edge_label": "aggregate: promotion usage summary per customer"
+    },
+    {
+      "from_node": "raw.shipping",
+      "to_node": "shipping_metrics",
+      "columns": [
+        "customer_id",
+        "ship_date",
+        "delivery_date",
+        "delivery_status",
+        "shipping_cost",
+        "shipping_method"
+      ],
+      "edge_label": "aggregate: shipping performance metrics per customer"
+    },
+    {
+      "from_node": "transactions_normalized",
+      "to_node": "monthly_spend",
+      "columns": [
+        "customer_id",
+        "order_date",
+        "net_amount_usd",
+        "transaction_id"
+      ],
+      "edge_label": "group by customer and month: create monthly time series"
+    },
+    {
+      "from_node": "monthly_spend",
+      "to_node": "spend_trend",
+      "columns": [
+        "customer_id",
+        "month_start",
+        "monthly_revenue",
+        "monthly_orders"
+      ],
+      "edge_label": "window functions: LAG, LEAD, rolling averages, NTILE for trends"
+    },
+    {
+      "from_node": "spend_trend",
+      "to_node": "latest_spend_trend",
+      "columns": [
+        "customer_id",
+        "monthly_revenue",
+        "rolling_3m_avg",
+        "rolling_6m_total",
+        "prev_month_revenue",
+        "spend_quartile",
+        "month_start"
+      ],
+      "edge_label": "filter: most recent month per customer, calculate MoM growth"
+    },
+    {
+      "from_node": "customer_transactions",
+      "to_node": "rfm_scores",
+      "columns": [
+        "customer_id",
+        "days_since_last_order",
+        "total_orders",
+        "lifetime_revenue"
+      ],
+      "edge_label": "NTILE window functions: create 5-point RFM scores"
+    },
+    {
+      "from_node": "rfm_scores",
+      "to_node": "rfm_segment",
+      "columns": [
+        "customer_id",
+        "recency_score",
+        "frequency_score",
+        "monetary_score"
+      ],
+      "edge_label": "CASE logic: map RFM scores to business segment names"
+    },
+    {
+      "from_node": "customer_transactions",
+      "to_node": "customer_tier_calc",
+      "columns": [
+        "customer_id",
+        "lifetime_revenue",
+        "total_orders",
+        "avg_order_value",
+        "days_since_last_order"
+      ],
+      "edge_label": "CASE logic: assign tiers and engagement status, calculate ranks"
+    },
+    {
+      "from_node": "active_customers",
+      "to_node": "cross_sell_candidates",
+      "columns": [
+        "customer_id"
+      ],
+      "edge_label": "inner join with top categories"
+    },
+    {
+      "from_node": "top_categories_per_customer",
+      "to_node": "cross_sell_candidates",
+      "columns": [
+        "customer_id",
+        "leaf_category"
+      ],
+      "edge_label": "filter: category_rank = 1, join with co-purchase analysis"
+    },
+    {
+      "from_node": "cross_sell_candidates",
+      "to_node": "cross_sell_agg",
+      "columns": [
+        "customer_id",
+        "co_category",
+        "co_purchase_count"
+      ],
+      "edge_label": "aggregate: top 5 recommendations per customer"
+    },
+    {
+      "from_node": "customer_transactions",
+      "to_node": "predicted_ltv",
+      "columns": [
+        "customer_id",
+        "lifetime_revenue",
+        "total_orders",
+        "avg_order_value",
+        "days_since_last_order",
+        "first_order_date",
+        "last_order_date"
+      ],
+      "edge_label": "calculate: 3-year LTV prediction and value segments"
+    },
+    {
+      "from_node": "active_customers",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "country",
+        "state",
+        "city",
+        "signup_date",
+        "days_since_signup",
+        "age",
+        "customer_status"
+      ],
+      "edge_label": "left join: primary customer data"
+    },
+    {
+      "from_node": "customer_transactions",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "total_orders",
+        "distinct_products",
+        "lifetime_revenue",
+        "lifetime_gross",
+        "lifetime_tax",
+        "avg_order_value",
+        "median_order_value",
+        "first_order_date",
+        "last_order_date",
+        "days_since_last_order",
+        "total_items_purchased",
+        "online_orders",
+        "offline_orders",
+        "payment_methods_used"
+      ],
+      "edge_label": "left join: transaction summary metrics"
+    },
+    {
+      "from_node": "customer_returns",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "total_returns",
+        "total_refund_amount",
+        "products_returned"
+      ],
+      "edge_label": "left join: return metrics"
+    },
+    {
+      "from_node": "customer_web_activity",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "total_sessions",
+        "page_views",
+        "add_to_cart_events",
+        "search_events",
+        "avg_time_on_page",
+        "days_since_last_activity",
+        "bounce_rate"
+      ],
+      "edge_label": "left join: web engagement metrics"
+    },
+    {
+      "from_node": "top_products_per_customer",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "product_name",
+        "product_revenue"
+      ],
+      "edge_label": "left join: top 3 products by rank"
+    },
+    {
+      "from_node": "top_categories_per_customer",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "leaf_category",
+        "category_spend"
+      ],
+      "edge_label": "left join: top category by rank = 1"
+    },
+    {
+      "from_node": "customer_promo_summary",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "promotions_used",
+        "total_promo_savings",
+        "promo_names"
+      ],
+      "edge_label": "left join: promotion usage summary"
+    },
+    {
+      "from_node": "shipping_metrics",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "avg_delivery_days",
+        "fastest_delivery",
+        "slowest_delivery",
+        "late_deliveries",
+        "total_shipping_cost",
+        "preferred_shipping_method"
+      ],
+      "edge_label": "left join: shipping performance metrics"
+    },
+    {
+      "from_node": "latest_spend_trend",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "latest_month_revenue",
+        "latest_3m_avg",
+        "latest_6m_total",
+        "mom_growth_pct"
+      ],
+      "edge_label": "left join: recent spend trends"
+    },
+    {
+      "from_node": "rfm_segment",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "recency_score",
+        "frequency_score",
+        "monetary_score",
+        "rfm_total",
+        "rfm_segment_name"
+      ],
+      "edge_label": "left join: RFM segmentation"
+    },
+    {
+      "from_node": "customer_tier_calc",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "customer_tier",
+        "revenue_rank",
+        "revenue_percentile",
+        "engagement_status"
+      ],
+      "edge_label": "left join: tier and engagement classification"
+    },
+    {
+      "from_node": "predicted_ltv",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "predicted_3yr_ltv",
+        "ltv_segment"
+      ],
+      "edge_label": "left join: lifetime value predictions"
+    },
+    {
+      "from_node": "cross_sell_agg",
+      "to_node": "analytics.customer_360_summary",
+      "columns": [
+        "recommended_categories",
+        "num_recommendations"
+      ],
+      "edge_label": "left join: cross-sell recommendations"
+    }
+  ]
+}

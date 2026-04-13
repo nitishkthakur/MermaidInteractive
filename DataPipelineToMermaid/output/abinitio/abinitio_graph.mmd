@@ -1,0 +1,74 @@
+flowchart LR
+    subgraph Sources["📥 Source Tables"]
+        sales_orders["sales.orders<br/><i>order_id, customer_id, order_date, total_amount, discount..."]
+        crm_customers["crm.customers<br/><i>customer_id, first_name, last_name, email, signup_date, ..."]
+        order_items_csv["order_items.csv<br/><i>item_id, order_id, product_id, product_name, category,..."]
+        exchange_rates_dat["exchange_rates.dat<br/><i>currency_code, usd_rate, rate_date</i>"]
+        product_hierarchy_dat["product_hierarchy.dat<br/><i>product_id, department, sub_category, brand, is_..."]
+    end
+    subgraph Transforms["⚙️ Transformations"]
+        read_orders[/"read_orders<br/><i>abinitio_component</i>"\]
+        read_customers[/"read_customers<br/><i>abinitio_component</i>"\]
+        read_order_items[/"read_order_items<br/><i>abinitio_component</i>"\]
+        lookup_exchange_rates[/"lookup_exchange_rates<br/><i>abinitio_component</i>"\]
+        lookup_product_hierarchy[/"lookup_product_hierarchy<br/><i>abinitio_component</i>"\]
+        filter_valid_orders[/"filter_valid_orders<br/><i>abinitio_component</i>"\]
+        filter_high_value_items[/"filter_high_value_items<br/><i>abinitio_component</i>"\]
+        join_order_customer[/"join_order_customer<br/><i>abinitio_component</i>"\]
+        join_order_items[/"join_order_items<br/><i>abinitio_component</i>"\]
+        rollup_by_customer[/"rollup_by_customer<br/><i>abinitio_component</i>"\]
+        assign_customer_tier[/"assign_customer_tier<br/><i>abinitio_component</i>"\]
+        dedup_customers[/"dedup_customers<br/><i>abinitio_component</i>"\]
+        partition_output[/"partition_output<br/><i>abinitio_component</i>"\]
+        write_customer_analytics[/"write_customer_analytics<br/><i>abinitio_component</i>"\]
+        write_summary_file[/"write_summary_file<br/><i>abinitio_component</i>"\]
+    end
+    subgraph Targets["📤 Target Tables"]
+        analytics_customer_daily_summary["analytics.customer_daily_summary<br/><i>customer_id, customer_name, email, co..."]
+        customer_summary___DATA_DATE__csv["customer_summary_${DATA_DATE}.csv<br/><i>customer_id, customer_name, region, ..."]
+    end
+    sales_orders -->|"read from Oracle; filter: order_date = ${DATA_D..."| read_orders
+    crm_customers -->|"read from Oracle; filter: is_active = 1"| read_customers
+    order_items_csv -->|"read from CSV file"| read_order_items
+    read_orders -->|"lookup exchange_rates.dat on currency_code; enr..."| lookup_exchange_rates
+    exchange_rates_dat -->|"lookup reference data"| lookup_exchange_rates
+    read_order_items -->|"lookup product_hierarchy.dat on product_id; enr..."| lookup_product_hierarchy
+    product_hierarchy_dat -->|"lookup reference data"| lookup_product_hierarchy
+    lookup_exchange_rates -->|"filter: amount_usd > 0 AND order_status IN ('co..."| filter_valid_orders
+    lookup_product_hierarchy -->|"filter: quantity > 0 AND unit_price > 0"| filter_high_value_items
+    filter_valid_orders -->|"left side of inner join on customer_id"| join_order_customer
+    read_customers -->|"right side of inner join on customer_id; enrich..."| join_order_customer
+    join_order_customer -->|"left side of left outer join on order_id"| join_order_items
+    filter_high_value_items -->|"right side of left outer join on order_id; add ..."| join_order_items
+    join_order_items -->|"aggregate by customer_id; calculate metrics: to..."| rollup_by_customer
+    rollup_by_customer -->|"assign tier and engagement score based on reven..."| assign_customer_tier
+    assign_customer_tier -->|"dedup on customer_id, keep first"| dedup_customers
+    dedup_customers -->|"partition by round-robin into 4 partitions for ..."| partition_output
+    partition_output -->|"merge into analytics.customer_daily_summary on ..."| write_customer_analytics
+    dedup_customers -->|"write subset to CSV file for distribution"| write_summary_file
+
+    classDef source fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef target fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef transform fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    class sales_orders source
+    class crm_customers source
+    class order_items_csv source
+    class exchange_rates_dat source
+    class product_hierarchy_dat source
+    class analytics_customer_daily_summary target
+    class customer_summary___DATA_DATE__csv target
+    class read_orders transform
+    class read_customers transform
+    class read_order_items transform
+    class lookup_exchange_rates transform
+    class lookup_product_hierarchy transform
+    class filter_valid_orders transform
+    class filter_high_value_items transform
+    class join_order_customer transform
+    class join_order_items transform
+    class rollup_by_customer transform
+    class assign_customer_tier transform
+    class dedup_customers transform
+    class partition_output transform
+    class write_customer_analytics transform
+    class write_summary_file transform

@@ -1,0 +1,119 @@
+flowchart LR
+    subgraph Sources["📥 Source Tables"]
+        raw_customers["raw.customers<br/><i>customer_id, first_name, last_name, email, phone, countr..."]
+        raw_transactions["raw.transactions<br/><i>transaction_id, customer_id, product_id, order_date, ..."]
+        raw_products["raw.products<br/><i>product_id, product_name, sku, unit_price, cost_price, ca..."]
+        raw_product_categories["raw.product_categories<br/><i>category_id, category_name, parent_category_id</i>"]
+        raw_exchange_rates["raw.exchange_rates<br/><i>from_currency, to_currency, rate, rate_date</i>"]
+        raw_web_events["raw.web_events<br/><i>customer_id, session_id, event_type, event_timestamp, t..."]
+        raw_returns["raw.returns<br/><i>customer_id, product_id, return_date, refund_amount, retu...."]
+        raw_promotions["raw.promotions<br/><i>promo_id, promo_name, promo_type, start_date, end_date,..."]
+        raw_shipping["raw.shipping<br/><i>customer_id, ship_date, delivery_date, delivery_status, s..."]
+    end
+    subgraph Transforms["⚙️ Transformations"]
+        active_customers{"active_customers<br/><i>CTE</i>"}
+        category_hierarchy{"category_hierarchy<br/><i>CTE</i>"}
+        enriched_products{"enriched_products<br/><i>CTE</i>"}
+        exchange_rates_latest{"exchange_rates_latest<br/><i>CTE</i>"}
+        transactions_normalized{"transactions_normalized<br/><i>CTE</i>"}
+        returns_summary{"returns_summary<br/><i>CTE</i>"}
+        customer_transactions{"customer_transactions<br/><i>CTE</i>"}
+        customer_returns{"customer_returns<br/><i>CTE</i>"}
+        customer_web_activity{"customer_web_activity<br/><i>CTE</i>"}
+        top_products_per_customer{"top_products_per_customer<br/><i>CTE</i>"}
+        top_categories_per_customer{"top_categories_per_customer<br/><i>CTE</i>"}
+        promotion_usage{"promotion_usage<br/><i>CTE</i>"}
+        customer_promo_summary{"customer_promo_summary<br/><i>CTE</i>"}
+        shipping_metrics{"shipping_metrics<br/><i>CTE</i>"}
+        monthly_spend{"monthly_spend<br/><i>CTE</i>"}
+        spend_trend{"spend_trend<br/><i>CTE</i>"}
+        latest_spend_trend{"latest_spend_trend<br/><i>CTE</i>"}
+        rfm_scores{"rfm_scores<br/><i>CTE</i>"}
+        rfm_segment{"rfm_segment<br/><i>CTE</i>"}
+        customer_tier_calc{"customer_tier_calc<br/><i>CTE</i>"}
+        cross_sell_candidates{"cross_sell_candidates<br/><i>CTE</i>"}
+        cross_sell_agg{"cross_sell_agg<br/><i>CTE</i>"}
+        predicted_ltv{"predicted_ltv<br/><i>CTE</i>"}
+    end
+    subgraph Targets["📤 Target Tables"]
+        analytics_customer_360_summary["analytics.customer_360_summary<br/><i>customer_id, full_name, email, phone, c..."]
+    end
+    raw_customers -->|"filter: status IN ('active','trial') AND email ..."| active_customers
+    raw_product_categories -->|"recursive CTE: build full category paths with d..."| category_hierarchy
+    raw_products -->|"left join with category hierarchy"| enriched_products
+    category_hierarchy -->|"enrich products with category paths and calcula..."| enriched_products
+    raw_exchange_rates -->|"window function: get latest rate per currency pair"| exchange_rates_latest
+    raw_transactions -->|"filter: status NOT IN ('cancelled','fraudulent'..."| transactions_normalized
+    exchange_rates_latest -->|"left join: convert all amounts to USD"| transactions_normalized
+    raw_returns -->|"aggregate: count returns, sum refunds, concaten..."| returns_summary
+    transactions_normalized -->|"aggregate: comprehensive transaction metrics pe..."| customer_transactions
+    returns_summary -->|"aggregate: return metrics per customer"| customer_returns
+    raw_web_events -->|"filter: customer_id IS NOT NULL, aggregate web ..."| customer_web_activity
+    transactions_normalized -->|"inner join with enriched_products"| top_products_per_customer
+    enriched_products -->|"rank products by revenue per customer"| top_products_per_customer
+    transactions_normalized -->|"inner join with enriched_products"| top_categories_per_customer
+    enriched_products -->|"rank categories by spend per customer, filter: ..."| top_categories_per_customer
+    transactions_normalized -->|"inner join with promotions on date range and op..."| promotion_usage
+    raw_promotions -->|"filter: discount_amount > 0"| promotion_usage
+    promotion_usage -->|"aggregate: promotion usage summary per customer"| customer_promo_summary
+    raw_shipping -->|"aggregate: shipping performance metrics per cus..."| shipping_metrics
+    transactions_normalized -->|"group by customer and month: create monthly tim..."| monthly_spend
+    monthly_spend -->|"window functions: LAG, LEAD, rolling averages, ..."| spend_trend
+    spend_trend -->|"filter: most recent month per customer, calcula..."| latest_spend_trend
+    customer_transactions -->|"NTILE window functions: create 5-point RFM scores"| rfm_scores
+    rfm_scores -->|"CASE logic: map RFM scores to business segment ..."| rfm_segment
+    customer_transactions -->|"CASE logic: assign tiers and engagement status,..."| customer_tier_calc
+    active_customers -->|"inner join with top categories"| cross_sell_candidates
+    top_categories_per_customer -->|"filter: category_rank = 1, join with co-purchas..."| cross_sell_candidates
+    cross_sell_candidates -->|"aggregate: top 5 recommendations per customer"| cross_sell_agg
+    customer_transactions -->|"calculate: 3-year LTV prediction and value segm..."| predicted_ltv
+    active_customers -->|"left join: primary customer data"| analytics_customer_360_summary
+    customer_transactions -->|"left join: transaction summary metrics"| analytics_customer_360_summary
+    customer_returns -->|"left join: return metrics"| analytics_customer_360_summary
+    customer_web_activity -->|"left join: web engagement metrics"| analytics_customer_360_summary
+    top_products_per_customer -->|"left join: top 3 products by rank"| analytics_customer_360_summary
+    top_categories_per_customer -->|"left join: top category by rank = 1"| analytics_customer_360_summary
+    customer_promo_summary -->|"left join: promotion usage summary"| analytics_customer_360_summary
+    shipping_metrics -->|"left join: shipping performance metrics"| analytics_customer_360_summary
+    latest_spend_trend -->|"left join: recent spend trends"| analytics_customer_360_summary
+    rfm_segment -->|"left join: RFM segmentation"| analytics_customer_360_summary
+    customer_tier_calc -->|"left join: tier and engagement classification"| analytics_customer_360_summary
+    predicted_ltv -->|"left join: lifetime value predictions"| analytics_customer_360_summary
+    cross_sell_agg -->|"left join: cross-sell recommendations"| analytics_customer_360_summary
+
+    classDef source fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef target fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef transform fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    class raw_customers source
+    class raw_transactions source
+    class raw_products source
+    class raw_product_categories source
+    class raw_exchange_rates source
+    class raw_web_events source
+    class raw_returns source
+    class raw_promotions source
+    class raw_shipping source
+    class analytics_customer_360_summary target
+    class active_customers transform
+    class category_hierarchy transform
+    class enriched_products transform
+    class exchange_rates_latest transform
+    class transactions_normalized transform
+    class returns_summary transform
+    class customer_transactions transform
+    class customer_returns transform
+    class customer_web_activity transform
+    class top_products_per_customer transform
+    class top_categories_per_customer transform
+    class promotion_usage transform
+    class customer_promo_summary transform
+    class shipping_metrics transform
+    class monthly_spend transform
+    class spend_trend transform
+    class latest_spend_trend transform
+    class rfm_scores transform
+    class rfm_segment transform
+    class customer_tier_calc transform
+    class cross_sell_candidates transform
+    class cross_sell_agg transform
+    class predicted_ltv transform

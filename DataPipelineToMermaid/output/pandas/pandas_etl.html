@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>E-Commerce Analytics ETL Pipeline — Data Lineage</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0; padding: 2rem; background: #fafafa;
+    }
+    h1 { color: #2F5496; margin-bottom: .5rem; }
+    .subtitle { color: #666; margin-bottom: 2rem; }
+    .mermaid { background: #fff; border: 1px solid #ddd; border-radius: 8px;
+               padding: 2rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>E-Commerce Analytics ETL Pipeline</h1>
+  <p class="subtitle">Data Lineage Diagram</p>
+  <div class="mermaid">
+flowchart LR
+    subgraph Sources["📥 Source Tables"]
+        data_orders_csv["data/orders.csv&lt;br/>&lt;i>order_id, customer_id, store_id, order_date, ship_date..."]
+        data_order_items_csv["data/order_items.csv&lt;br/>&lt;i>item_id, order_id, product_id, quantity, unit_pri..."]
+        data_customers_parquet["data/customers.parquet&lt;br/>&lt;i>customer_id, first_name, last_name, email, sign..."]
+        data_products_parquet["data/products.parquet&lt;br/>&lt;i>product_id, product_name, category, sub_category..."]
+        data_exchange_rates_csv["data/exchange_rates.csv&lt;br/>&lt;i>rate_date, from_currency, to_currency, rate&lt;/i>"]
+        data_web_sessions_csv["data/web_sessions.csv&lt;br/>&lt;i>session_id, customer_id, session_start, session_..."]
+    end
+    subgraph Transforms["⚙️ Transformations"]
+        extract_orders[/"extract_orders&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        extract_order_items[/"extract_order_items&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        extract_customers[/"extract_customers&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        extract_products[/"extract_products&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        extract_exchange_rates[/"extract_exchange_rates&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        extract_web_sessions[/"extract_web_sessions&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        clean_orders[/"clean_orders&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        normalize_currency[/"normalize_currency&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        enrich_order_items[/"enrich_order_items&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_customer_360_order_agg[/"build_customer_360_order_agg&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_customer_360_top_category[/"build_customer_360_top_category&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_customer_360_top_brand[/"build_customer_360_top_brand&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_customer_360_distinct_products[/"build_customer_360_distinct_products&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_customer_360_web_agg[/"build_customer_360_web_agg&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_customer_360_rfm[/"build_customer_360_rfm&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_customer_360_tier_assignment[/"build_customer_360_tier_assignment&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_customer_360_ltv_prediction[/"build_customer_360_ltv_prediction&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_customer_360_final_merge[/"build_customer_360_final_merge&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_product_performance[/"build_product_performance&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        build_daily_kpi[/"build_daily_kpi&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        load_to_parquet_customer_360[/"load_to_parquet_customer_360&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        load_to_parquet_product_performance[/"load_to_parquet_product_performance&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        load_to_csv_daily_kpi[/"load_to_csv_daily_kpi&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+        load_to_postgres_customer_summary[/"load_to_postgres_customer_summary&lt;br/>&lt;i>pandas_step&lt;/i>"\]
+    end
+    subgraph Targets["📤 Target Tables"]
+        output_customer_360_parquet["output/customer_360.parquet&lt;br/>&lt;i>customer_id, first_name, last_name, email,..."]
+        output_product_performance_parquet["output/product_performance.parquet&lt;br/>&lt;i>product_id, product_name, category,..."]
+        output_daily_kpi_csv["output/daily_kpi.csv&lt;br/>&lt;i>report_date, order_count, unique_customers, total..."]
+        public_customer_summary["public.customer_summary&lt;br/>&lt;i>customer_id, first_name, last_name, email, sig..."]
+    end
+    data_orders_csv -->|"extract orders with date parsing and type coercion"| clean_orders
+    data_order_items_csv -->|"extract order line items"| enrich_order_items
+    data_customers_parquet -->|"extract customer demographics"| build_customer_360_final_merge
+    data_products_parquet -->|"left join on product_id for category and cost data"| enrich_order_items
+    data_exchange_rates_csv -->|"lookup latest exchange rates for currency conve..."| normalize_currency
+    data_web_sessions_csv -->|"extract web engagement data"| build_customer_360_web_agg
+    clean_orders -->|"filter: status NOT IN ('cancelled', 'fraudulent..."| normalize_currency
+    normalize_currency -->|"currency converted to USD using latest exchange..."| build_customer_360_order_agg
+    normalize_currency -->|"order context for product performance analysis"| build_product_performance
+    normalize_currency -->|"daily aggregation of order metrics"| build_daily_kpi
+    enrich_order_items -->|"join with products for category/brand analysis ..."| build_customer_360_top_category
+    enrich_order_items -->|"product-level aggregation with margin calculations"| build_product_performance
+    build_customer_360_order_agg -->|"RFM scoring based on recency, frequency, moneta..."| build_customer_360_rfm
+    build_customer_360_order_agg -->|"customer tier assignment based on revenue and o..."| build_customer_360_tier_assignment
+    build_customer_360_order_agg -->|"LTV prediction based on historical spend patterns"| build_customer_360_ltv_prediction
+    build_customer_360_top_category -->|"customer's highest spending category"| build_customer_360_final_merge
+    build_customer_360_top_brand -->|"customer's highest spending brand"| build_customer_360_final_merge
+    build_customer_360_distinct_products -->|"count of unique products purchased"| build_customer_360_final_merge
+    build_customer_360_web_agg -->|"web engagement metrics aggregated by customer"| build_customer_360_final_merge
+    build_customer_360_rfm -->|"RFM scores and segment classification"| build_customer_360_final_merge
+    build_customer_360_final_merge -->|"comprehensive customer 360 view with derived fi..."| output_customer_360_parquet
+    build_customer_360_final_merge -->|"same customer 360 data loaded to PostgreSQL"| public_customer_summary
+    build_product_performance -->|"product performance metrics with ABC classifica..."| output_product_performance_parquet
+    build_daily_kpi -->|"daily KPI summary with rolling metrics and day-..."| output_daily_kpi_csv
+
+    classDef source fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef target fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef transform fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    class data_orders_csv source
+    class data_order_items_csv source
+    class data_customers_parquet source
+    class data_products_parquet source
+    class data_exchange_rates_csv source
+    class data_web_sessions_csv source
+    class output_customer_360_parquet target
+    class output_product_performance_parquet target
+    class output_daily_kpi_csv target
+    class public_customer_summary target
+    class extract_orders transform
+    class extract_order_items transform
+    class extract_customers transform
+    class extract_products transform
+    class extract_exchange_rates transform
+    class extract_web_sessions transform
+    class clean_orders transform
+    class normalize_currency transform
+    class enrich_order_items transform
+    class build_customer_360_order_agg transform
+    class build_customer_360_top_category transform
+    class build_customer_360_top_brand transform
+    class build_customer_360_distinct_products transform
+    class build_customer_360_web_agg transform
+    class build_customer_360_rfm transform
+    class build_customer_360_tier_assignment transform
+    class build_customer_360_ltv_prediction transform
+    class build_customer_360_final_merge transform
+    class build_product_performance transform
+    class build_daily_kpi transform
+    class load_to_parquet_customer_360 transform
+    class load_to_parquet_product_performance transform
+    class load_to_csv_daily_kpi transform
+    class load_to_postgres_customer_summary transform
+  </div>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default',
+    flowchart: { curve: 'basis', useMaxWidth: false } });</script>
+</body>
+</html>
