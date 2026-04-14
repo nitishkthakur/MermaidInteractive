@@ -34,13 +34,12 @@ def _load_env() -> None:
 
 
 def _build_model() -> Any:
-    """Construct a ChatOpenAI model configured for OpenRouter."""
+    """Construct a ChatOpenRouter model."""
     _load_env()
-    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-    if not api_key:
+    if not os.getenv("OPENROUTER_API_KEY", "").strip():
         print(
             "ERROR: OPENROUTER_API_KEY is not set.\n"
-            "  1. Copy .env.template → .env\n"
+            "  1. Copy .env.example → .env\n"
             "  2. Paste your OpenRouter API key\n"
             "  3. Re-run.",
             file=sys.stderr,
@@ -51,12 +50,10 @@ def _build_model() -> Any:
     max_tokens = int(os.getenv("LLM_MAX_TOKENS", "16384"))
     temperature = float(os.getenv("LLM_TEMPERATURE", "0"))
 
-    from langchain_openai import ChatOpenAI  # lazy import
+    from langchain_openrouter import ChatOpenRouter  # lazy import
 
-    return ChatOpenAI(
+    return ChatOpenRouter(
         model=model_name,
-        api_key=api_key,
-        base_url="https://openrouter.ai/api/v1",
         temperature=temperature,
         max_tokens=max_tokens,
     )

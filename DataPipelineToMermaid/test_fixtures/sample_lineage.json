@@ -111,108 +111,141 @@
     {
       "target_table": "analytics.customer_summary",
       "target_column": "customer_id",
-      "source_columns": ["sales.customers.customer_id"],
-      "transformation": "sales.customers.customer_id",
+      "source_refs": [
+        {"source_table": "sales.customers", "source_column": "customer_id"}
+      ],
+      "transformation": "sales.customers.customer_id AS customer_id",
       "transformation_type": "direct_copy",
       "intermediate_steps": [
         {"component_name": "cte_active_customers", "expression": "customer_id", "output_column": "customer_id"}
       ],
+      "filename": "test_fixtures/complex_sql_ctes.sql",
       "notes": "Filtered to active customers only"
     },
     {
       "target_table": "analytics.customer_summary",
       "target_column": "customer_name",
-      "source_columns": ["sales.customers.first_name", "sales.customers.last_name"],
-      "transformation": "CONCAT(first_name, ' ', last_name)",
+      "source_refs": [
+        {"source_table": "sales.customers", "source_column": "first_name"},
+        {"source_table": "sales.customers", "source_column": "last_name"}
+      ],
+      "transformation": "CONCAT(first_name, ' ', last_name) AS customer_name",
       "transformation_type": "concatenation",
       "intermediate_steps": [
         {"component_name": "cte_active_customers", "expression": "first_name, last_name", "output_column": "first_name, last_name"}
       ],
+      "filename": "test_fixtures/complex_sql_ctes.sql",
       "notes": ""
     },
     {
       "target_table": "analytics.customer_summary",
       "target_column": "email",
-      "source_columns": ["sales.customers.email"],
-      "transformation": "email",
+      "source_refs": [
+        {"source_table": "sales.customers", "source_column": "email"}
+      ],
+      "transformation": "sales.customers.email AS email",
       "transformation_type": "direct_copy",
       "intermediate_steps": [],
+      "filename": "test_fixtures/complex_sql_ctes.sql",
       "notes": ""
     },
     {
       "target_table": "analytics.customer_summary",
       "target_column": "region",
-      "source_columns": ["sales.customers.region"],
-      "transformation": "region",
+      "source_refs": [
+        {"source_table": "sales.customers", "source_column": "region"}
+      ],
+      "transformation": "sales.customers.region AS region",
       "transformation_type": "direct_copy",
       "intermediate_steps": [],
+      "filename": "test_fixtures/complex_sql_ctes.sql",
       "notes": ""
     },
     {
       "target_table": "analytics.customer_summary",
       "target_column": "total_orders",
-      "source_columns": ["sales.orders.order_id"],
-      "transformation": "COUNT(*)",
+      "source_refs": [
+        {"source_table": "sales.orders", "source_column": "order_id"}
+      ],
+      "transformation": "COUNT(*) AS total_orders",
       "transformation_type": "aggregation",
       "intermediate_steps": [
         {"component_name": "cte_order_stats", "expression": "COUNT(*)", "output_column": "total_orders"}
       ],
+      "filename": "test_fixtures/complex_sql_ctes.sql",
       "notes": "Count of all orders per customer"
     },
     {
       "target_table": "analytics.customer_summary",
       "target_column": "total_revenue",
-      "source_columns": ["sales.orders.total_amount"],
-      "transformation": "SUM(total_amount)",
+      "source_refs": [
+        {"source_table": "sales.orders", "source_column": "total_amount"}
+      ],
+      "transformation": "SUM(total_amount) AS total_revenue",
       "transformation_type": "aggregation",
       "intermediate_steps": [
         {"component_name": "cte_order_stats", "expression": "SUM(total_amount)", "output_column": "total_revenue"}
       ],
+      "filename": "test_fixtures/complex_sql_ctes.sql",
       "notes": ""
     },
     {
       "target_table": "analytics.customer_summary",
       "target_column": "avg_order_value",
-      "source_columns": ["sales.orders.total_amount"],
-      "transformation": "AVG(total_amount)",
+      "source_refs": [
+        {"source_table": "sales.orders", "source_column": "total_amount"}
+      ],
+      "transformation": "AVG(total_amount) AS avg_order_value",
       "transformation_type": "aggregation",
       "intermediate_steps": [
         {"component_name": "cte_order_stats", "expression": "AVG(total_amount)", "output_column": "avg_order_value"}
       ],
+      "filename": "test_fixtures/complex_sql_ctes.sql",
       "notes": ""
     },
     {
       "target_table": "analytics.customer_summary",
       "target_column": "top_category",
-      "source_columns": ["products.products.category", "sales.order_items.product_id", "sales.orders.customer_id"],
-      "transformation": "ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY COUNT(*) DESC) — pick rn=1",
+      "source_refs": [
+        {"source_table": "products.products", "source_column": "category"},
+        {"source_table": "sales.order_items", "source_column": "product_id"},
+        {"source_table": "sales.orders", "source_column": "customer_id"}
+      ],
+      "transformation": "FIRST_VALUE(p.category) OVER (PARTITION BY o.customer_id ORDER BY COUNT(*) DESC) AS top_category",
       "transformation_type": "window_function",
       "intermediate_steps": [
-        {"component_name": "cte_top_category", "expression": "ROW_NUMBER() OVER (...) as rn, p.category", "output_column": "category"}
+        {"component_name": "cte_top_category", "expression": "ROW_NUMBER() OVER (PARTITION BY o.customer_id ORDER BY COUNT(*) DESC) AS rn, p.category", "output_column": "category"}
       ],
+      "filename": "test_fixtures/complex_sql_ctes.sql",
       "notes": "Most frequently ordered product category"
     },
     {
       "target_table": "analytics.customer_summary",
       "target_column": "customer_tier",
-      "source_columns": ["sales.orders.total_amount"],
-      "transformation": "CASE WHEN SUM(total_amount) > 10000 THEN 'gold' WHEN > 5000 THEN 'silver' ELSE 'bronze' END",
+      "source_refs": [
+        {"source_table": "sales.orders", "source_column": "total_amount"}
+      ],
+      "transformation": "CASE WHEN SUM(total_amount) > 10000 THEN 'gold' WHEN SUM(total_amount) > 5000 THEN 'silver' ELSE 'bronze' END AS customer_tier",
       "transformation_type": "case_logic",
       "intermediate_steps": [
         {"component_name": "cte_order_stats", "expression": "SUM(total_amount)", "output_column": "total_revenue"},
-        {"component_name": "cte_customer_tier", "expression": "CASE WHEN total_revenue > 10000 ...", "output_column": "customer_tier"}
+        {"component_name": "cte_customer_tier", "expression": "CASE WHEN total_revenue > 10000 THEN 'gold' WHEN total_revenue > 5000 THEN 'silver' ELSE 'bronze' END", "output_column": "customer_tier"}
       ],
+      "filename": "test_fixtures/complex_sql_ctes.sql",
       "notes": "Tier assigned based on lifetime revenue"
     },
     {
       "target_table": "analytics.customer_summary",
       "target_column": "days_since_signup",
-      "source_columns": ["sales.customers.signup_date"],
-      "transformation": "DATEDIFF(DAY, signup_date, GETDATE())",
+      "source_refs": [
+        {"source_table": "sales.customers", "source_column": "signup_date"}
+      ],
+      "transformation": "DATEDIFF(DAY, signup_date, GETDATE()) AS days_since_signup",
       "transformation_type": "date_manipulation",
       "intermediate_steps": [
         {"component_name": "cte_active_customers", "expression": "signup_date", "output_column": "signup_date"}
       ],
+      "filename": "test_fixtures/complex_sql_ctes.sql",
       "notes": ""
     }
   ],

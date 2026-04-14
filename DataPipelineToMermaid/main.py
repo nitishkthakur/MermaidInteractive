@@ -42,6 +42,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Output JSON path (default: <input>.lineage.json)",
     )
+    p_ext.add_argument(
+        "--skip-lineage-fields",
+        nargs="*",
+        default=[],
+        metavar="FIELD",
+        dest="skip_lineage_fields",
+        help=(
+            "ColumnLineage fields to omit from the output JSON "
+            "(saves tokens / reduces verbosity). "
+            "Choices: notes filename intermediate_steps transformation_type"
+        ),
+    )
     p_ext.add_argument("-v", "--verbose", action="store_true")
 
     # ── convert ─────────────────────────────────────────────────────
@@ -71,6 +83,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_cvt.add_argument(
         "--no-html", action="store_true", help="Skip HTML generation"
     )
+    p_cvt.add_argument(
+        "--skip-lineage-fields",
+        nargs="*",
+        default=[],
+        metavar="FIELD",
+        dest="skip_lineage_fields",
+        help=(
+            "ColumnLineage fields to omit when re-exporting to JSON. "
+            "Choices: notes filename intermediate_steps transformation_type"
+        ),
+    )
     p_cvt.add_argument("-v", "--verbose", action="store_true")
 
     # ── full ────────────────────────────────────────────────────────
@@ -91,6 +114,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="table",
         help="Mermaid detail level (default: table)",
     )
+    p_full.add_argument(
+        "--skip-lineage-fields",
+        nargs="*",
+        default=[],
+        metavar="FIELD",
+        dest="skip_lineage_fields",
+        help=(
+            "ColumnLineage fields to omit from the output JSON "
+            "(saves tokens / reduces verbosity). "
+            "Choices: notes filename intermediate_steps transformation_type"
+        ),
+    )
     p_full.add_argument("-v", "--verbose", action="store_true")
 
     return p.parse_args(argv)
@@ -110,9 +145,12 @@ def cmd_extract(args: argparse.Namespace) -> None:
     print(f"📄 Output: {output_path}")
     print()
 
+    skip = args.skip_lineage_fields or []
     lineage = extract_lineage(str(input_path), verbose=args.verbose)
-    lineage.to_json(output_path)
+    lineage.to_json(output_path, skip_lineage_fields=skip or None)
 
+    if skip:
+        print(f"   (fields omitted from column_lineage: {', '.join(skip)})")
     print(f"\n✅ Lineage JSON written to {output_path}")
     print(f"   {len(lineage.sources)} sources, "
           f"{len(lineage.targets)} targets, "
@@ -129,6 +167,7 @@ def cmd_convert(args: argparse.Namespace) -> None:
         print(f"ERROR: File not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
+    skip = args.skip_lineage_fields or []
     lineage = PipelineLineage.from_json(input_path)
     out_dir = Path(args.output_dir) if args.output_dir else input_path.parent
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -138,6 +177,8 @@ def cmd_convert(args: argparse.Namespace) -> None:
     print(f"📂 Input:      {input_path}")
     print(f"📁 Output dir: {out_dir}")
     print(f"   Pipeline:   {lineage.pipeline_name} ({lineage.pipeline_type})")
+    if skip:
+        print(f"   Skipping column_lineage fields: {', '.join(skip)}")
     print()
 
     if not args.no_excel:
@@ -177,12 +218,16 @@ def cmd_full(args: argparse.Namespace) -> None:
     print(f"📁 Output dir: {out_dir}")
     print()
 
+    skip = args.skip_lineage_fields or []
+
     # Step 1: Extract
     print("─── Step 1/2: Extracting lineage via LLM ───")
     lineage = extract_lineage(str(input_path), verbose=args.verbose)
     json_path = out_dir / f"{stem}.lineage.json"
-    lineage.to_json(json_path)
+    lineage.to_json(json_path, skip_lineage_fields=skip or None)
     print(f"  📄 JSON:     {json_path}")
+    if skip:
+        print(f"   (fields omitted from column_lineage: {', '.join(skip)})")
 
     # Step 2: Convert
     print("\n─── Step 2/2: Generating artifacts ───")

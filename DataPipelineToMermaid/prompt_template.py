@@ -74,8 +74,13 @@ conforms EXACTLY to this schema:
     {
       "target_table":        "<schema.table or table>",
       "target_column":       "<column name>",
-      "source_columns":      ["<table.column>", ...],
-      "transformation":      "<the COMPLETE expression — e.g. SUM(orders.amount * exchange_rates.usd_rate) — never abbreviate>",
+      "source_refs": [
+        {
+          "source_table":  "<schema.table or just table — the table this column comes from>",
+          "source_column": "<column name in that table>"
+        }
+      ],
+      "transformation":      "<COMPLETE SQL expression ending with AS <output_column_name> — e.g. CONCAT(first_name, ' ', last_name) AS customer_name.  For non-SQL sources translate the logic into equivalent SQL.  NEVER abbreviate.>",
       "transformation_type": "<direct_copy | aggregation | calculation | case_logic | join_key | window_function | type_cast | concatenation | lookup | conditional | constant | string_manipulation | date_manipulation | coalesce | other>",
       "intermediate_steps": [
         {
@@ -84,6 +89,7 @@ conforms EXACTLY to this schema:
           "output_column":  "<column alias at this step>"
         }
       ],
+      "filename": "<the source file (relative path or basename) in which this transformation is defined>",
       "notes": "<business context — e.g. 'Used for quarterly revenue reporting' or 'Filters out cancelled orders'>"
     }
   ],
@@ -114,18 +120,29 @@ A) **Tables** — Identify EVERY table that is read from (source) or written
    to / inserted into / merged into (target).  Use schema.table notation
    when the schema is available.
 
-B) **Columns** — Use ``table.column`` notation EVERYWHERE so the reader
-   always knows which table a column belongs to.  For CTEs and subqueries,
-   use the CTE alias as the "table" part (e.g. ``cte_active.customer_id``).
+B) **Source references** — Each entry in ``source_refs`` must have BOTH
+   ``source_table`` (schema.table notation when available) and
+   ``source_column`` (just the column name).  This mirrors the
+   ``target_table`` / ``target_column`` split on the target side.
+   Never use dot-concatenated ``"table.column"`` strings — always split them.
 
-C) **Column lineage — COMPLETE transformations** — For EVERY column in
-   every target table, trace back to the source columns AND include the
-   FULL transformation expression.  Never write just "calculated" or
-   "derived" — write the actual formula.  Examples:
-     ✅ ``"SUM(orders.amount * exchange_rates.usd_rate)"``
-     ✅ ``"CASE WHEN orders.total >= 50000 THEN 'Platinum' WHEN orders.total >= 20000 THEN 'Gold' ELSE 'Bronze' END"``
+C) **Column lineage — COMPLETE SQL transformations** — For EVERY column in
+   every target table, trace back to the source columns AND express the
+   transformation as a **SQL expression ending with ``AS <output_column_name>``**.
+   For non-SQL sources (Informatica, Ab-Initio, Pandas) translate the
+   logic into equivalent SQL.  Examples:
+     ✅ ``SUM(orders.amount * exchange_rates.usd_rate) AS total_revenue_usd``
+     ✅ ``CASE WHEN orders.total >= 50000 THEN 'Platinum' WHEN orders.total >= 20000 THEN 'Gold' ELSE 'Bronze' END AS customer_tier``
+     ✅ ``CONCAT(customers.first_name, ' ', customers.last_name) AS customer_name``
      ❌ ``"calculated from amount"``  ← TOO VAGUE
      ❌ ``"derived"``  ← USELESS
+     ❌ ``"SUM(amount)"``  ← MISSING ``AS column_name``
+
+D1) **Filename** — Populate the ``filename`` field of each ``column_lineage``
+   entry with the source file (relative path or basename) in which the
+   transformation is defined.  When a single file is analysed this will be
+   the same for every entry; when multiple files contribute, use the file
+   that contains the specific CTE / proc / transform step.
 
 D) **Transformation types** — Classify each mapping:
    • direct_copy — column passes through unchanged
@@ -283,21 +300,24 @@ Before outputting the JSON, re-read the source code THREE TIMES and verify:
      INTO, read_csv, read_sql, to_csv, to_sql, input_table, output_table
      is captured in sources or targets.
   ☐  Every column in the final target layout has an entry in column_lineage.
-  ☐  source_columns lists reference actual columns from actual tables —
-     no hallucinated table or column names.
+  ☐  source_refs entries have BOTH ``source_table`` and ``source_column``
+     as separate fields — no dot-concatenated strings.
+  ☐  Every ``transformation`` ends with ``AS <output_column_name>`` and
+     contains a COMPLETE SQL expression, even for non-SQL sources.
   ☐  Every CTE, stored proc, subquery, and Ab-Initio component is in
      components.
   ☐  data_flow_edges form a CONNECTED graph from sources → targets
      (no orphaned nodes).
   ☐  transformation_type is one of the allowed values.
+  ☐  ``filename`` is populated for every column_lineage entry.
   ☐  The JSON is valid (no trailing commas, all strings quoted, arrays
      properly closed).
   ☐  **LOGIC CHECK**: For EVERY component, is the description specific
      enough that a finance analyst could explain what it does without
      seeing the code?
   ☐  **FORMULA CHECK**: For EVERY column_lineage entry, does the
-     ``transformation`` field contain the ACTUAL formula/expression,
-     not a vague summary?
+     ``transformation`` field contain the ACTUAL SQL formula ending with
+     ``AS column_name``, not a vague summary?
   ☐  **EDGE LABEL CHECK**: Do data_flow_edges have descriptive labels
      that explain what happens at each step?
   ☐  **COMPLETENESS CHECK**: If you removed the source code and only had

@@ -1,0 +1,12 @@
+# DataPipelineToMermaid — runtime configuration
+# Edit this file to control output behaviour.
+
+# ── Artifact mode ──────────────────────────────────────────────────
+# regular : one row per target column  (default)
+# long    : one row per file in the lineage chain for each target column;
+#           rows are ordered upstream-first (execution order), all key
+#           columns repeat on every row for LLM readability.
+# wide    : one row per target column; each file in the chain becomes a
+#           hop_n_ cluster of columns expanding rightward; clusters are
+#           color-coded; raw sources appear in hop_1 only.
+artifact_mode: regular

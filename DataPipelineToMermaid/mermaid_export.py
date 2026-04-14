@@ -108,13 +108,10 @@ def _table_level_mermaid(lineage: PipelineLineage) -> str:
         edge_map: dict[tuple[str, str], set[str]] = {}
         for cl in lineage.column_lineage:
             tgt_table = cl.target_table
-            for src_col in cl.source_columns:
-                parts = src_col.rsplit(".", 1)
-                src_table = parts[0] if len(parts) > 1 else src_col
-                col_name = parts[-1] if len(parts) > 1 else src_col
-                edge_map.setdefault((src_table, tgt_table), set()).add(
-                    col_name
-                )
+            for ref in cl.source_refs:
+                edge_map.setdefault(
+                    (ref.source_table, tgt_table), set()
+                ).add(ref.source_column)
 
         for (src, tgt), cols in sorted(edge_map.items()):
             fid = _safe_id(src)
@@ -174,8 +171,8 @@ def _column_level_mermaid(lineage: PipelineLineage) -> str:
     # Edges from column lineage
     for cl in lineage.column_lineage:
         tgt_nid = _safe_id(f"{cl.target_table}.{cl.target_column}")
-        for src_col in cl.source_columns:
-            src_nid = _safe_id(src_col)
+        for ref in cl.source_refs:
+            src_nid = _safe_id(f"{ref.source_table}.{ref.source_column}")
             label = _esc(cl.transformation_type, 25)
             lines.append(f'    {src_nid} -->|"{label}"| {tgt_nid}')
 
